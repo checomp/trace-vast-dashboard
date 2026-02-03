@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="row mt-5">
+    <div class="col-md-8 offset-md-2">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4>Error</h4>
+            </div>
+            <div class="card-body">
+                <p class="lead">{{ error_message }}</p>
+                <hr>
+                <p class="text-muted">
+                    If this problem persists, please contact: 
+                    <a href="mailto:checomp@andrew.cmu.edu">checomp@andrew.cmu.edu</a>
+                </p>
+                <a href="/" class="btn btn-primary">Return to Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

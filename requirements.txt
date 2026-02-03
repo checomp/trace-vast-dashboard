@@ -1,0 +1,4 @@
+Flask==3.0.0
+Flask-Caching==2.1.0
+vastpy
+requests==2.31.0
