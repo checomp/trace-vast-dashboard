@@ -7,7 +7,8 @@ config = configparser.ConfigParser()
 # Look for config in multiple locations (in order of priority)
 config_locations = [
     os.environ.get('VAST_QUOTA_CONFIG', ''),
-    '/opt/vast-quota-web/config.ini',
+    'config.ini',  # Current working directory
+    os.path.join(os.path.dirname(__file__), 'config.ini'),  # Script directory
     os.path.expanduser('~/.vast-quota.ini'),
     '/etc/vast-quota.conf'
 ]
