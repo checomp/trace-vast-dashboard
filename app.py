@@ -32,25 +32,53 @@ def dashboard():
         return render_template('error.html', 
                              error_message="No quota found for your account.")
     
+    # Extract raw values (handle different API field name variants)
+    hard_limit = quota.get('hard_limit')
+    soft_limit = quota.get('soft_limit')
+    used_effective = quota.get('used_effective_capacity') or quota.get('used_effective')
+    used_logical = quota.get('used_logical_capacity') or quota.get('used_logical')
+
     # Calculate usage percentage
-    if quota['hard_limit'] and quota['used_effective']:
-        usage_pct = calculate_percentage(quota['used_effective'], quota['hard_limit'])
+    if hard_limit and used_effective:
+        usage_pct = calculate_percentage(used_effective, hard_limit)
     else:
         usage_pct = 0
-    
+
+    # Calculate DRR
+    from modules.formatting import calculate_drr
+    drr = calculate_drr(used_logical, used_effective) if used_logical and used_effective else 0
+
     # Format data for display
     quota_display = {
-        'name': quota['name'],
-        'path': quota['path'],
-        'hard_limit': format_bytes(quota['hard_limit']),
-        'soft_limit': format_bytes(quota['soft_limit']),
-        'used_effective': format_bytes(quota['used_effective']),
-        'used_logical': format_bytes(quota['used_logical']),
+        'name': quota.get('name'),
+        'path': quota.get('path'),
+        'guid': quota.get('guid'),
+        'state': quota.get('state'),
+
+        # Formatted capacity values
+        'hard_limit': format_bytes(hard_limit),
+        'soft_limit': format_bytes(soft_limit),
+        'used_effective': format_bytes(used_effective),
+        'used_logical': format_bytes(used_logical),
+
+        # Raw byte values
+        'hard_limit_bytes': hard_limit,
+        'soft_limit_bytes': soft_limit,
+        'used_effective_bytes': used_effective,
+        'used_logical_bytes': used_logical,
+
+        # Calculations
         'usage_percentage': f"{usage_pct:.1f}",
-        'state': quota['state']
+        'drr': f"{drr:.2f}",
+
+        # Grace period
+        'grace_period': quota.get('grace_period'),
+
+        # Capacity breakdown
+        'capacity_breakdown': quota.get('capacity_breakdown')
     }
-    
-    return render_template('dashboard.html', 
+
+    return render_template('dashboard.html',
                          user=user,
                          quota=quota_display)
 

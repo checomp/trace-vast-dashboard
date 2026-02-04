@@ -217,19 +217,147 @@ def find_quota_by_group(group_name):
         print(f"Error searching quotas for group '{group_name}': {e}")
         raise
 
+def get_capacity_breakdown(quota_path):
+    """
+    Get capacity breakdown for subdirectories under a quota path.
+
+    Args:
+        quota_path: The path of the quota to analyze
+
+    Returns:
+        dict: Capacity breakdown with root data and subdirectory details
+        Example:
+        {
+            'root': {
+                'path': '/quota/path',
+                'usable_bytes': 1000000000,
+                'unique_bytes': 800000000,
+                'logical_bytes': 1200000000,
+                'drr': 1.2
+            },
+            'subdirectories': [
+                {
+                    'path': 'subdir1',
+                    'usable_bytes': 500000000,
+                    'unique_bytes': 400000000,
+                    'logical_bytes': 600000000,
+                    'drr': 1.2,
+                    'percentage': 50.0
+                }
+            ]
+        }
+    """
+    try:
+        client = get_vast_client()
+        capacity = client.capacity.get(path=quota_path)
+
+        if not capacity:
+            return None
+
+        result = {
+            'root': None,
+            'subdirectories': []
+        }
+
+        # Try to find exact path match in details first (more accurate)
+        path_data = None
+        if 'details' in capacity and capacity['details']:
+            for entry in capacity['details']:
+                if isinstance(entry, list) and len(entry) >= 2:
+                    if entry[0] == quota_path:
+                        path_data = entry[1].get('data') if isinstance(entry[1], dict) else None
+                        break
+
+        # If we found path-specific data, use it; otherwise fall back to root_data
+        if path_data and len(path_data) >= 3:
+            usable_bytes = path_data[0]
+            unique_bytes = path_data[1]
+            logical_bytes = path_data[2]
+        elif 'root_data' in capacity and capacity['root_data']:
+            root_data = capacity['root_data']
+            if len(root_data) >= 3:
+                usable_bytes = root_data[0]
+                unique_bytes = root_data[1]
+                logical_bytes = root_data[2]
+            else:
+                return None
+        else:
+            return None
+
+        # Calculate DRR for root
+        drr = logical_bytes / usable_bytes if usable_bytes > 0 else 0
+
+        result['root'] = {
+            'path': quota_path,
+            'usable_bytes': usable_bytes,
+            'unique_bytes': unique_bytes,
+            'logical_bytes': logical_bytes,
+            'drr': drr
+        }
+
+        # Process subdirectories
+        if 'details' in capacity and capacity['details']:
+            for entry in capacity['details']:
+                if isinstance(entry, list) and len(entry) >= 2:
+                    path = entry[0]
+                    entry_data = entry[1]
+
+                    # Skip the root path itself
+                    if path == quota_path:
+                        continue
+
+                    if isinstance(entry_data, dict) and 'data' in entry_data:
+                        data = entry_data['data']
+                        if len(data) >= 3:
+                            sub_usable = data[0]
+                            sub_unique = data[1]
+                            sub_logical = data[2]
+
+                            # Calculate relative path
+                            if path.startswith(quota_path):
+                                rel_path = path[len(quota_path):].lstrip('/') or '.'
+                            else:
+                                rel_path = path
+
+                            # Calculate DRR
+                            sub_drr = sub_logical / sub_usable if sub_usable > 0 else 0
+
+                            # Calculate percentage of quota
+                            percentage = (sub_usable / usable_bytes * 100) if usable_bytes > 0 else 0
+
+                            result['subdirectories'].append({
+                                'path': rel_path,
+                                'usable_bytes': sub_usable,
+                                'unique_bytes': sub_unique,
+                                'logical_bytes': sub_logical,
+                                'drr': sub_drr,
+                                'percentage': percentage
+                            })
+
+            # Sort subdirectories by path
+            result['subdirectories'].sort(key=lambda x: x['path'])
+
+        return result
+
+    except Exception as e:
+        print(f"Error fetching capacity breakdown for '{quota_path}': {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 def get_quota_for_user(andrew_id):
     """
     Get quota information for a specific user by:
     1. SSH to trace.cmu.edu (as SSH user from config) to get Unix groups for andrew_id
     2. Find the primary group (not 'users')
     3. Search VAST quotas for that group name
-    4. Return matching quota details
+    4. Return matching quota details with capacity breakdown
 
     Args:
         andrew_id: The username/andrew_id to query
 
     Returns:
-        dict: Quota information, or None if not found
+        dict: Complete quota information including capacity breakdown, or None if not found
     """
     try:
         # Step 1: Get Unix groups from trace.cmu.edu
@@ -248,6 +376,17 @@ def get_quota_for_user(andrew_id):
 
         # Step 3: Find quota matching this group
         quota = find_quota_by_group(primary_group)
+
+        if not quota:
+            return None
+
+        # Step 4: Get capacity breakdown for this quota
+        quota_path = quota.get('path')
+        if quota_path:
+            print(f"Fetching capacity breakdown for path: {quota_path}")
+            capacity_breakdown = get_capacity_breakdown(quota_path)
+            if capacity_breakdown:
+                quota['capacity_breakdown'] = capacity_breakdown
 
         return quota
 

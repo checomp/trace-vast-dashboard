@@ -19,33 +19,69 @@
             <div class="card-body">
                 <h5>Basic Information</h5>
                 <table class="table table-sm">
-                    <tr><th>Path:</th><td>{{ quota.path }}</td></tr>
-                    <tr><th>State:</th><td>{{ quota.state }}</td></tr>
+                    <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
+                    <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
+                    <tr><th>State:</th><td><span class="badge badge-success">{{ quota.state }}</span></td></tr>
+                    {% if quota.grace_period %}
+                    <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
+                    {% endif %}
                 </table>
 
                 <h5 class="mt-4">Capacity Information</h5>
                 <table class="table table-sm">
-                    <tr><th>Hard Limit:</th><td>{{ quota.hard_limit }}</td></tr>
-                    <tr><th>Soft Limit:</th><td>{{ quota.soft_limit }}</td></tr>
-                    <tr><th>Used (Effective):</th><td>{{ quota.used_effective }}</td></tr>
-                    <tr><th>Used (Logical):</th><td>{{ quota.used_logical }}</td></tr>
+                    <tr>
+                        <th>Hard Limit:</th>
+                        <td>{{ quota.hard_limit }}
+                            {% if quota.hard_limit_bytes %}
+                            <small class="text-muted">({{ "{:,}".format(quota.hard_limit_bytes) }} bytes)</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Soft Limit:</th>
+                        <td>{{ quota.soft_limit }}
+                            {% if quota.soft_limit_bytes %}
+                            <small class="text-muted">({{ "{:,}".format(quota.soft_limit_bytes) }} bytes)</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Used (Effective):</th>
+                        <td>{{ quota.used_effective }}
+                            {% if quota.used_effective_bytes %}
+                            <small class="text-muted">({{ "{:,}".format(quota.used_effective_bytes) }} bytes)</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Used (Logical):</th>
+                        <td>{{ quota.used_logical }}
+                            {% if quota.used_logical_bytes %}
+                            <small class="text-muted">({{ "{:,}".format(quota.used_logical_bytes) }} bytes)</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Data Reduction Ratio (DRR):</th>
+                        <td>{{ quota.drr }}:1</td>
+                    </tr>
                 </table>
 
                 <h5 class="mt-4">Usage</h5>
                 <div class="progress usage-bar">
-                    <div class="progress-bar 
+                    <div class="progress-bar
                         {% if quota.usage_percentage|float < 75 %}bg-success
                         {% elif quota.usage_percentage|float < 90 %}bg-warning
                         {% else %}bg-danger{% endif %}"
-                        role="progressbar" 
+                        role="progressbar"
                         style="width: {{ quota.usage_percentage }}%"
-                        aria-valuenow="{{ quota.usage_percentage }}" 
-                        aria-valuemin="0" 
+                        aria-valuenow="{{ quota.usage_percentage }}"
+                        aria-valuemin="0"
                         aria-valuemax="100">
                         {{ quota.usage_percentage }}%
                     </div>
                 </div>
-                
+
                 {% if quota.usage_percentage|float >= 90 %}
                 <div class="alert alert-danger mt-3" role="alert">
                     <strong>Warning:</strong> Your quota usage is above 90%. Please clean up or request more space.
@@ -54,6 +90,47 @@
                 <div class="alert alert-warning mt-3" role="alert">
                     <strong>Notice:</strong> Your quota usage is above 75%. Consider cleaning up unnecessary files.
                 </div>
+                {% endif %}
+
+                {% if quota.capacity_breakdown %}
+                <h5 class="mt-4">Capacity Breakdown by Directory</h5>
+                {% if quota.capacity_breakdown.root %}
+                <div class="alert alert-info">
+                    <strong>Root Path:</strong> <code>{{ quota.capacity_breakdown.root.path }}</code><br>
+                    <strong>Effective Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB<br>
+                    <strong>Logical Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB<br>
+                    <strong>DRR:</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
+                </div>
+                {% endif %}
+
+                {% if quota.capacity_breakdown.subdirectories %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Path</th>
+                                <th>Effective</th>
+                                <th>Logical</th>
+                                <th>% of Quota</th>
+                                <th>DRR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subdir in quota.capacity_breakdown.subdirectories %}
+                            <tr>
+                                <td><code>{{ subdir.path }}</code></td>
+                                <td>{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
+                                <td>{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
+                                <td>{{ "{:.2f}".format(subdir.percentage) }}%</td>
+                                <td>{{ "{:.2f}".format(subdir.drr) }}:1</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted"><em>No subdirectories found</em></p>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
