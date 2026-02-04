@@ -118,6 +118,10 @@ def get_user_quota(username):
 
         quota = client.quotas.get(id=quota_id)
 
+        # Handle case where API returns a list instead of a single dict
+        if isinstance(quota, list):
+            quota = quota[0] if quota else None
+
         # Return the full quota object
         return quota
 
