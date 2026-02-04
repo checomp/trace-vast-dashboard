@@ -148,19 +148,26 @@
                 {% if quota.capacity_breakdown.root %}
                 <div class="alert alert-info">
                     <strong>Root Path:</strong> <code>{{ quota.capacity_breakdown.root.path }}</code><br>
-                    <strong>Effective Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
+                    <strong>Effective Capacity (disk space used):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
                     ({{ "{:,.0f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**3)) }} GB)<br>
-                    <strong>Logical Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
+                    <strong>Logical Capacity (original data):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
                     ({{ "{:,.0f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**3)) }} GB)<br>
-                    <strong>Unique Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
-                    <strong>DRR:</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
+                    <strong>Unique Capacity (deduplicated):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
+                    <strong>DRR (Data Reduction Ratio):</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
+                    <br><small class="text-muted"><em>Note: These values come from the capacity API and may differ slightly from the quota API values above due to different measurement methods/timing.</em></small>
                 </div>
                 {% endif %}
 
                 {% if quota.capacity_breakdown.subdirectories %}
+                {% set top_level_count = namespace(value=0) %}
+                {% for subdir in quota.capacity_breakdown.subdirectories %}
+                    {% if '/' not in subdir.path %}
+                        {% set top_level_count.value = top_level_count.value + 1 %}
+                    {% endif %}
+                {% endfor %}
                 <div class="mb-3">
                     <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#subdirTable" aria-expanded="false" aria-controls="subdirTable" id="subdirToggleBtn">
-                        <span id="toggleIcon">▶</span> Show Subdirectories ({{ quota.capacity_breakdown.subdirectories|length }})
+                        <span id="toggleIcon">▶</span> Show Top-Level Subdirectories ({{ top_level_count.value }})
                     </button>
                 </div>
                 <div class="collapse" id="subdirTable">
@@ -169,9 +176,9 @@
                             <thead class="thead-dark">
                                 <tr>
                                     <th>Subdirectory Path</th>
-                                    <th class="text-right">Effective</th>
-                                    <th class="text-right">Logical</th>
-                                    <th class="text-right">% of Total</th>
+                                    <th class="text-right">Effective (Disk)</th>
+                                    <th class="text-right">Logical (Original)</th>
+                                    <th class="text-right">% of Quota Used</th>
                                     <th class="text-right">DRR</th>
                                 </tr>
                             </thead>
