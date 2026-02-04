@@ -58,8 +58,9 @@
 
                 <h5 class="mt-4">
                     Quota Accounting
-                    <span class="badge bg-info" data-bs-toggle="tooltip" data-bs-placement="right"
-                          data-bs-title="What counts against your quota limit">ℹ️</span>
+                    <span data-bs-toggle="tooltip" data-bs-placement="right"
+                          data-bs-title="What counts against your quota limit"
+                          style="cursor: help;">ℹ️</span>
                 </h5>
                 <table class="table table-sm">
                     <tr>
@@ -167,46 +168,16 @@
 
                 {% if quota.capacity_breakdown %}
                 <h5 class="mt-4">
-                    Physical Disk Usage by Directory
-                    <span class="badge bg-info" data-bs-toggle="tooltip" data-bs-placement="right"
-                          data-bs-title="Actual disk space used after compression/deduplication">ℹ️</span>
+                    Usage by Directory
+                    <span data-bs-toggle="tooltip" data-bs-placement="right"
+                          data-bs-title="Physical disk usage and logical data size by directory"
+                          style="cursor: help;">ℹ️</span>
                 </h5>
 
                 <div class="alert alert-warning mb-3">
                     <strong>💡 Key Difference:</strong> The "Quota Accounting" section above shows what counts against your quota limit (~logical data size).
                     This section shows actual physical disk usage, which is typically much lower due to VAST's compression and deduplication.
                 </div>
-
-                {% if quota.capacity_breakdown.root %}
-                <div class="alert alert-info">
-                    <strong>Root Path:</strong> <code>{{ quota.capacity_breakdown.root.path }}</code><br>
-                    <strong>
-                        <span data-bs-toggle="tooltip" data-bs-placement="right"
-                              data-bs-title="Physical disk space used after compression and deduplication"
-                              style="cursor: help;">
-                            Physical Disk Used:
-                        </span>
-                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
-                    ({{ "{:,.0f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**3)) }} GB)<br>
-                    <strong>
-                        <span data-bs-toggle="tooltip" data-bs-placement="right"
-                              data-bs-title="Original uncompressed data size (matches quota accounting above)"
-                              style="cursor: help;">
-                            Logical Capacity:
-                        </span>
-                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
-                    ({{ "{:,.0f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**3)) }} GB)<br>
-                    <strong>
-                        <span data-bs-toggle="tooltip" data-bs-placement="right"
-                              data-bs-title="Unique data after removing duplicates (before compression)"
-                              style="cursor: help;">
-                            Unique Capacity:
-                        </span>
-                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
-                    <strong>DRR:</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
-                    <small class="text-muted">({{ "{:.0f}".format((1 - quota.capacity_breakdown.root.usable_bytes / quota.capacity_breakdown.root.logical_bytes) * 100) }}% space savings)</small>
-                </div>
-                {% endif %}
 
                 {% if quota.capacity_breakdown.subdirectories %}
                 {% set top_level_count = namespace(value=0) %}
@@ -231,7 +202,7 @@
                                               style="cursor: help;">Physical (Disk)</span>
                                     </th>
                                     <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Original uncompressed data size"
+                                        <span data-bs-toggle="tooltip" data-bs-title="Original uncompressed data size (counts against quota)"
                                               style="cursor: help;">Logical (Original)</span>
                                     </th>
                                     <th class="text-right">
