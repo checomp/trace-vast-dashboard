@@ -29,6 +29,11 @@ else:
         'password': '123456',
         'timeout': '30'
     }
+    config['ssh'] = {
+        'username': 'rwalsh',
+        'host': 'trace.cmu.edu',
+        'key_file': '~/.ssh/id_rsa'
+    }
     config['cache'] = {
         'ttl': '600'
     }

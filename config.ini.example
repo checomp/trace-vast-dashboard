@@ -4,6 +4,11 @@ password = your_vast_password
 address = 172.19.16.30
 timeout = 30
 
+[ssh]
+username = rwalsh
+host = trace.cmu.edu
+key_file = ~/.ssh/id_rsa
+
 [cache]
 ttl = 600
 

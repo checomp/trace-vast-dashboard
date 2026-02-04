@@ -1,6 +1,8 @@
 """VAST API client wrapper"""
 from vastpy import VASTClient
 import config
+import subprocess
+import os
 
 _client = None
 
@@ -123,20 +125,130 @@ def get_user_quota(username):
         print(f"Error fetching quota for user '{username}': {e}")
         raise
 
+def get_unix_groups(search_username):
+    """
+    Get Unix groups for a user by SSHing to trace.cmu.edu and running 'groups' command.
+    Uses SSH username and key from config to connect, then queries groups for search_username.
+
+    Args:
+        search_username: The username to query groups for (e.g., 'jdoe')
+
+    Returns:
+        list: List of group names (excluding 'users'), or empty list on error
+    """
+    try:
+        # Get SSH credentials from config
+        ssh_user = config.get('ssh', 'username', 'rwalsh')
+        ssh_host = config.get('ssh', 'host', 'trace.cmu.edu')
+        ssh_key = config.get('ssh', 'key_file', '~/.ssh/id_rsa')
+        ssh_key = os.path.expanduser(ssh_key)  # Expand ~ to home directory
+        ssh_target = f"{ssh_user}@{ssh_host}"
+
+        # Build SSH command with key file
+        cmd = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10']
+
+        # Add key file if specified
+        if ssh_key and os.path.exists(ssh_key):
+            cmd.extend(['-i', ssh_key])
+
+        cmd.extend([ssh_target, 'groups', search_username])
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+
+        if result.returncode != 0:
+            print(f"SSH failed: {result.stderr}")
+            return []
+
+        # Parse output: "username : group1 group2 group3"
+        output = result.stdout.strip()
+
+        # Split on colon and get the groups part
+        if ':' in output:
+            groups_part = output.split(':', 1)[1].strip()
+        else:
+            groups_part = output
+
+        # Split groups and filter out 'users' and username itself
+        groups = groups_part.split()
+        filtered_groups = [g for g in groups if g != 'users' and g != search_username]
+
+        return filtered_groups
+
+    except subprocess.TimeoutExpired:
+        print(f"SSH timeout when querying groups for '{search_username}'")
+        return []
+    except Exception as e:
+        print(f"Error getting Unix groups for '{search_username}': {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def find_quota_by_group(group_name):
+    """
+    Find quotas in VAST that match a group name.
+
+    Args:
+        group_name: The Unix group name to search for
+
+    Returns:
+        dict: First matching quota, or None if not found
+    """
+    try:
+        client = get_vast_client()
+
+        # Get all quotas
+        quotas = client.quotas.get()
+
+        # Search for quotas where the name contains the group name
+        for quota in quotas:
+            quota_name = quota.get('name', '').lower()
+            if group_name.lower() in quota_name:
+                print(f"Found matching quota: '{quota.get('name')}'")
+                return quota
+
+        print(f"No quota found matching group '{group_name}'")
+        return None
+
+    except Exception as e:
+        print(f"Error searching quotas for group '{group_name}': {e}")
+        raise
+
 def get_quota_for_user(andrew_id):
     """
-    Get quota information for a specific user.
-    Now properly queries user's assigned quota from VAST API.
+    Get quota information for a specific user by:
+    1. SSH to trace.cmu.edu (as SSH user from config) to get Unix groups for andrew_id
+    2. Find the primary group (not 'users')
+    3. Search VAST quotas for that group name
+    4. Return matching quota details
 
     Args:
         andrew_id: The username/andrew_id to query
 
     Returns:
-        dict: Quota information with usage statistics
+        dict: Quota information, or None if not found
     """
     try:
-        # Use the new get_user_quota function that properly queries the user
-        return get_user_quota(andrew_id)
+        # Step 1: Get Unix groups from trace.cmu.edu
+        print(f"Getting Unix groups for '{andrew_id}' from trace.cmu.edu...")
+        unix_groups = get_unix_groups(andrew_id)
+
+        if not unix_groups:
+            print(f"No groups found for user '{andrew_id}'")
+            return None
+
+        print(f"Found groups: {unix_groups}")
+
+        # Step 2: Use the first group (primary group)
+        primary_group = unix_groups[0]
+        print(f"Using primary group: '{primary_group}'")
+
+        # Step 3: Find quota matching this group
+        quota = find_quota_by_group(primary_group)
+
+        return quota
+
     except Exception as e:
         print(f"Error fetching quota for user '{andrew_id}': {e}")
+        import traceback
+        traceback.print_exc()
         return None

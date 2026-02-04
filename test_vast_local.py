@@ -50,6 +50,8 @@ def test_user_groups_and_quota(search_username):
             return None
 
         print(f"✓ Found user '{search_username}'")
+        print(json.dumps(user_info, indent=2))
+
 
         # Display user information
         print("\nUser Information:")
@@ -58,15 +60,6 @@ def test_user_groups_and_quota(search_username):
         print(f"  UID: {user_info.get('uid', 'N/A')}")
         print(f"  Primary Group: {user_info.get('primary_group_name', 'N/A')}")
         print(f"  Leading Group: {user_info.get('leading_group_name', 'N/A')}")
-
-        # Display groups
-        groups = user_info.get('groups', [])
-        print(f"\nGroup Memberships ({len(groups)} groups):")
-        if groups:
-            for i, group in enumerate(groups, 1):
-                print(f"  {i}. {group}")
-        else:
-            print("  (no groups)")
 
         # Display GIDs
         gids = user_info.get('gids', [])
@@ -171,7 +164,7 @@ def test_vast_connection(login_user, password, address, search_user):
             print()
 
         # Get detailed info for first quota
-        first_quota = quotas[0]
+        first_quota = quotas[3]
         quota_name = first_quota.get('name', 'unknown')
 
         print("=" * 60)
