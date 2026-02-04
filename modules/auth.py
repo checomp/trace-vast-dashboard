@@ -1,17 +1,21 @@
 """Authentication module for Shibboleth integration"""
 from functools import wraps
-from flask import request, abort, g
+from flask import request, abort, g, current_app
 from modules.vast_client import get_user_groups
 
 def get_current_user():
-    """Extract authenticated user from REMOTE_USER set by Shibboleth."""
+    """
+    Extract authenticated user from REMOTE_USER set by Shibboleth.
+
+    When debug=false: Requires Shibboleth authentication (REMOTE_USER must be set)
+    When debug=true: No authentication required, returns None until user searches
+    """
     eppn = request.environ.get('REMOTE_USER', '')
 
-    # ===== TESTING MODE: Use test user when no authentication =====
-    # To disable testing mode: Remove or comment out this block
     if not eppn:
-        return 'rwalsh'  # Test user for VAST quota testing
-    # ===== END TESTING MODE =====
+        # In production mode (debug=false), require authentication
+        # In debug mode (debug=true), return None (no fallback user)
+        return None
 
     # Extract andrew_id from eppn (e.g., andrew_id@andrew.cmu.edu -> andrew_id)
     andrew_id = eppn.split('@')[0] if '@' in eppn else eppn

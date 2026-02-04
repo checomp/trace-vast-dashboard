@@ -20,18 +20,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @app.route('/')
-@login_required
 def dashboard():
     """Main dashboard showing user's quota or search results."""
     current_user = get_current_user()
 
+    # In production mode (debug=false), require authentication
+    if not app.debug and not current_user:
+        abort(403, "Authentication required")
+
     # Check if user is searching for someone else
     search_user = request.args.get('user', '').strip()
+
+    # In debug mode with no search query and no authenticated user, show search prompt
+    if app.debug and not search_user and not current_user:
+        return render_template('search_prompt.html', debug_mode=True)
 
     if search_user:
         # Searching for another user
         user = search_user
-        logger.info(f"User {current_user} searching for quota of: {user}")
+        logger.info(f"User {current_user or 'anonymous'} searching for quota of: {user}")
     else:
         # Show current user's quota
         user = current_user

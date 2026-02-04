@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Search User Quota{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mt-4">Storage Quota Information</h1>
+        <p class="lead">Search for a user's quota information</p>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">🔍 Search User Quota <span class="badge badge-warning">Debug Mode</span></h5>
+                <p class="text-muted">Enter an Andrew ID to view their storage quota information.</p>
+                <form method="get" action="/" class="form-inline">
+                    <input type="text" name="user" class="form-control mr-2" placeholder="Enter Andrew ID" required autofocus>
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="alert alert-info" role="alert">
+            <strong>Note:</strong> Debug mode is enabled. No authentication is required to search for user quotas.
+        </div>
+    </div>
+</div>
+{% endblock %}
