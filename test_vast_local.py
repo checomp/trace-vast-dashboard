@@ -28,79 +28,66 @@ import config
 
 def test_user_groups_and_quota(search_username):
     """
-    Test fetching user groups and quota from VAST API using vast_client functions.
+    Test fetching Unix groups via SSH and quota from VAST using the new approach.
 
     Args:
         search_username: The username to search for and query
 
     Returns:
-        dict: Combined user groups and quota information
+        dict: Combined Unix groups and quota information
     """
     print("\n" + "=" * 60)
-    print(f"Testing User Groups & Quota API for: {search_username}")
+    print(f"Testing Unix Groups & Quota for: {search_username}")
     print("=" * 60)
 
     try:
-        # Use vast_client.get_user_groups() instead of duplicating code
-        print(f"\nQuerying VAST for user '{search_username}'...")
-        user_info = vast_client.get_user_groups(search_username)
+        # Step 1: Get Unix groups via SSH
+        print(f"\n[1/3] Getting Unix groups via SSH...")
+        unix_groups = vast_client.get_unix_groups(search_username)
 
-        if not user_info:
-            print(f"✗ User '{search_username}' not found in VAST")
+        if not unix_groups:
+            print(f"✗ No Unix groups found for user '{search_username}'")
             return None
 
-        print(f"✓ Found user '{search_username}'")
-        print(json.dumps(user_info, indent=2))
+        print(f"✓ Found Unix groups: {unix_groups}")
 
+        # Step 2: Get quota using the new SSH-based approach
+        print(f"\n[2/3] Finding quota for user's primary group...")
+        quota_data = vast_client.get_quota_for_user(search_username)
 
-        # Display user information
-        print("\nUser Information:")
-        print(f"  Username: {user_info.get('username', 'N/A')}")
-        print(f"  Name: {user_info.get('name', 'N/A')}")
-        print(f"  UID: {user_info.get('uid', 'N/A')}")
-        print(f"  Primary Group: {user_info.get('primary_group_name', 'N/A')}")
-        print(f"  Leading Group: {user_info.get('leading_group_name', 'N/A')}")
+        if not quota_data:
+            print(f"✗ No quota found for user '{search_username}'")
+            return None
 
-        # Display GIDs
-        gids = user_info.get('gids', [])
-        if gids:
-            print(f"\nGroup IDs (GIDs): {', '.join(map(str, gids))}")
+        # Step 3: Display quota details
+        print(f"\n[3/3] Quota Details:")
+        print(f"✓ Quota Name: {quota_data.get('name', 'N/A')}")
+        print(f"  Path: {quota_data.get('path', 'N/A')}")
+        print(f"  ID: {quota_data.get('id', 'N/A')}")
 
-        # Get quota information using vast_client.get_user_quota()
-        quota_ids = user_info.get('quota_ids', [])
-        quota_data = None
+        hard_limit = quota_data.get('hard_limit', 0)
+        used_effective = quota_data.get('used_effective_capacity', 0)
 
-        if quota_ids:
-            print(f"\n✓ User has {len(quota_ids)} quota(s)")
-            print(f"  Quota IDs: {quota_ids}")
-
-            # Fetch quota details using vast_client function
-            try:
-                print(f"\nFetching quota details for user '{search_username}'...")
-                quota_data = vast_client.get_user_quota(search_username)
-
-                if quota_data:
-                    print(f"✓ Retrieved quota: {quota_data.get('name', 'N/A')}")
-                    print(f"  Path: {quota_data.get('path', 'N/A')}")
-
-                    hard_limit = quota_data.get('hard_limit', 0)
-                    used_effective = quota_data.get('used_effective_capacity', 0)
-
-                    if hard_limit:
-                        usage_pct = (used_effective / hard_limit * 100) if hard_limit > 0 else 0
-                        print(f"  Usage: {used_effective / (1024**4):.2f} TB / {hard_limit / (1024**4):.2f} TB ({usage_pct:.1f}%)")
-            except Exception as e:
-                print(f"⚠ Could not fetch quota details: {e}")
+        if hard_limit:
+            usage_pct = (used_effective / hard_limit * 100) if hard_limit > 0 else 0
+            used_tb = used_effective / (1024**4)
+            limit_tb = hard_limit / (1024**4)
+            print(f"  Usage: {used_tb:.2f} TB / {limit_tb:.2f} TB ({usage_pct:.1f}%)")
         else:
-            print("\n⚠ User has no quotas assigned")
+            print(f"  Usage: No limit set")
+
+        print("\n" + "=" * 60)
+        print("Full Quota Object:")
+        print("=" * 60)
+        print(json.dumps(quota_data, indent=2, default=str))
 
         return {
-            'user_info': user_info,
+            'unix_groups': unix_groups,
             'quota': quota_data
         }
 
     except Exception as e:
-        print(f"✗ Error querying user: {e}")
+        print(f"✗ Error: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -173,8 +160,12 @@ def test_vast_connection(login_user, password, address, search_user):
         print("\nQuota Information:")
         print(json.dumps(first_quota, indent=2))
 
-        # Test user groups and quota functionality
+        # Test user groups and quota functionality (new SSH-based approach)
         user_data = test_user_groups_and_quota(search_user)
+
+        if not user_data:
+            print("\n⚠ Could not retrieve user data")
+            return None
 
         # Save output to file
         output_file = 'vast_test_output.json'
