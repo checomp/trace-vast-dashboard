@@ -213,8 +213,23 @@
                             <tbody>
                                 {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
                                 {% if '/' not in subdir.path %}
-                                <tr>
-                                    <td><code>{{ subdir.path }}</code></td>
+                                {# This is a top-level directory #}
+                                {% set has_children = namespace(value=false) %}
+                                {% for child in quota.capacity_breakdown.subdirectories %}
+                                    {% if child.path.startswith(subdir.path + '/') and child.path.count('/') <= 2 %}
+                                        {% set has_children.value = true %}
+                                    {% endif %}
+                                {% endfor %}
+                                <tr style="cursor: {% if has_children.value %}pointer{% else %}default{% endif %};"
+                                    {% if has_children.value %}onclick="toggleChildren('{{ subdir.path }}')"{% endif %}>
+                                    <td>
+                                        {% if has_children.value %}
+                                        <span id="icon-{{ subdir.path }}" style="display: inline-block; width: 15px;">▶</span>
+                                        {% else %}
+                                        <span style="display: inline-block; width: 15px;"></span>
+                                        {% endif %}
+                                        <code>{{ subdir.path }}</code>
+                                    </td>
                                     <td class="text-right">{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">
@@ -224,6 +239,30 @@
                                     </td>
                                     <td class="text-right">{{ "{:.2f}".format(subdir.drr) }}:1</td>
                                 </tr>
+
+                                {# Child rows (hidden by default) #}
+                                {% for child in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
+                                    {% if child.path.startswith(subdir.path + '/') %}
+                                        {% set depth = child.path.count('/') %}
+                                        {% if depth <= 2 %}
+                                        <tr class="child-{{ subdir.path }}" style="display: none; background-color: #f8f9fa;">
+                                            <td>
+                                                <span style="display: inline-block; width: {{ depth * 20 }}px;"></span>
+                                                <span style="display: inline-block; width: 15px;"></span>
+                                                <code style="font-size: 0.9em;">{{ child.path }}</code>
+                                            </td>
+                                            <td class="text-right">{{ "{:,.2f}".format(child.usable_bytes / (1024**3)) }} GB</td>
+                                            <td class="text-right">{{ "{:,.2f}".format(child.logical_bytes / (1024**3)) }} GB</td>
+                                            <td class="text-right">
+                                                <span class="badge {% if child.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                                    {{ "{:.1f}".format(child.percentage) }}%
+                                                </span>
+                                            </td>
+                                            <td class="text-right">{{ "{:.2f}".format(child.drr) }}:1</td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
                                 {% endif %}
                                 {% endfor %}
                             </tbody>
@@ -255,6 +294,24 @@
                             return new bootstrap.Tooltip(tooltipTriggerEl);
                         });
                     });
+
+                    // Toggle child directories
+                    function toggleChildren(parentPath) {
+                        // Escape special characters for use in querySelector
+                        const escapedPath = parentPath.replace(/[\/\\.]/g, '\\$&');
+                        const children = document.querySelectorAll('.child-' + escapedPath);
+                        const icon = document.getElementById('icon-' + parentPath);
+
+                        const isVisible = children[0] && children[0].style.display !== 'none';
+
+                        children.forEach(function(child) {
+                            child.style.display = isVisible ? 'none' : 'table-row';
+                        });
+
+                        if (icon) {
+                            icon.textContent = isVisible ? '▶' : '▼';
+                        }
+                    }
                 </script>
             </div>
         </div>
