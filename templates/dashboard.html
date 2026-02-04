@@ -174,11 +174,6 @@
                           style="cursor: help;">ℹ️</span>
                 </h5>
 
-                <div class="alert alert-warning mb-3">
-                    <strong>💡 Key Difference:</strong> The "Quota Accounting" section above shows what counts against your quota limit (~logical data size).
-                    This section shows actual physical disk usage, which is typically much lower due to VAST's compression and deduplication.
-                </div>
-
                 {% if quota.capacity_breakdown.subdirectories %}
                 {% set top_level_count = namespace(value=0) %}
                 {% for subdir in quota.capacity_breakdown.subdirectories %}
