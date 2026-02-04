@@ -56,7 +56,11 @@
                     {% endif %}
                 </table>
 
-                <h5 class="mt-4">Capacity Information</h5>
+                <h5 class="mt-4">
+                    Quota Accounting
+                    <span class="badge bg-info" data-bs-toggle="tooltip" data-bs-placement="right"
+                          data-bs-title="What counts against your quota limit">ℹ️</span>
+                </h5>
                 <table class="table table-sm">
                     <tr>
                         <th>Hard Limit:</th>
@@ -75,7 +79,13 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Used (Effective):</th>
+                        <th>
+                            <span data-bs-toggle="tooltip" data-bs-placement="right"
+                                  data-bs-title="Logical data size that counts against your quota (same as Logical Capacity below)"
+                                  style="cursor: help; text-decoration: underline dotted;">
+                                Used (Quota Accounting):
+                            </span>
+                        </th>
                         <td>{{ quota.used_effective }}
                             {% if quota.used_effective_bytes %}
                             <small class="text-muted">({{ "{:,}".format(quota.used_effective_bytes) }} bytes)</small>
@@ -83,7 +93,13 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Used (Logical):</th>
+                        <th>
+                            <span data-bs-toggle="tooltip" data-bs-placement="right"
+                                  data-bs-title="Original uncompressed data size"
+                                  style="cursor: help; text-decoration: underline dotted;">
+                                Used (Logical):
+                            </span>
+                        </th>
                         <td>{{ quota.used_logical }}
                             {% if quota.used_logical_bytes %}
                             <small class="text-muted">({{ "{:,}".format(quota.used_logical_bytes) }} bytes)</small>
@@ -91,7 +107,13 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Data Reduction Ratio (DRR):</th>
+                        <th>
+                            <span data-bs-toggle="tooltip" data-bs-placement="right"
+                                  data-bs-title="Data reduction ratio: Logical / Physical disk space"
+                                  style="cursor: help; text-decoration: underline dotted;">
+                                Data Reduction Ratio (DRR):
+                            </span>
+                        </th>
                         <td>{{ quota.drr }}:1</td>
                     </tr>
                 </table>
@@ -144,17 +166,45 @@
                 {% endif %}
 
                 {% if quota.capacity_breakdown %}
-                <h5 class="mt-4">Capacity Breakdown by Directory</h5>
+                <h5 class="mt-4">
+                    Physical Disk Usage by Directory
+                    <span class="badge bg-info" data-bs-toggle="tooltip" data-bs-placement="right"
+                          data-bs-title="Actual disk space used after compression/deduplication">ℹ️</span>
+                </h5>
+
+                <div class="alert alert-warning mb-3">
+                    <strong>💡 Key Difference:</strong> The "Quota Accounting" section above shows what counts against your quota limit (~logical data size).
+                    This section shows actual physical disk usage, which is typically much lower due to VAST's compression and deduplication.
+                </div>
+
                 {% if quota.capacity_breakdown.root %}
                 <div class="alert alert-info">
                     <strong>Root Path:</strong> <code>{{ quota.capacity_breakdown.root.path }}</code><br>
-                    <strong>Effective Capacity (disk space used):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
+                    <strong>
+                        <span data-bs-toggle="tooltip" data-bs-placement="right"
+                              data-bs-title="Physical disk space used after compression and deduplication"
+                              style="cursor: help; text-decoration: underline dotted;">
+                            Physical Disk Used:
+                        </span>
+                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
                     ({{ "{:,.0f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**3)) }} GB)<br>
-                    <strong>Logical Capacity (original data):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
+                    <strong>
+                        <span data-bs-toggle="tooltip" data-bs-placement="right"
+                              data-bs-title="Original uncompressed data size (matches quota accounting above)"
+                              style="cursor: help; text-decoration: underline dotted;">
+                            Logical Capacity:
+                        </span>
+                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
                     ({{ "{:,.0f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**3)) }} GB)<br>
-                    <strong>Unique Capacity (deduplicated):</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
-                    <strong>DRR (Data Reduction Ratio):</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
-                    <br><small class="text-muted"><em>Note: These values come from the capacity API and may differ slightly from the quota API values above due to different measurement methods/timing.</em></small>
+                    <strong>
+                        <span data-bs-toggle="tooltip" data-bs-placement="right"
+                              data-bs-title="Unique data after removing duplicates (before compression)"
+                              style="cursor: help; text-decoration: underline dotted;">
+                            Unique Capacity:
+                        </span>
+                    </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
+                    <strong>DRR:</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
+                    <small class="text-muted">({{ "{:.0f}".format((1 - quota.capacity_breakdown.root.usable_bytes / quota.capacity_breakdown.root.logical_bytes) * 100) }}% space savings)</small>
                 </div>
                 {% endif %}
 
@@ -176,10 +226,22 @@
                             <thead class="thead-dark">
                                 <tr>
                                     <th>Subdirectory Path</th>
-                                    <th class="text-right">Effective (Disk)</th>
-                                    <th class="text-right">Logical (Original)</th>
-                                    <th class="text-right">% of Quota Used</th>
-                                    <th class="text-right">DRR</th>
+                                    <th class="text-right">
+                                        <span data-bs-toggle="tooltip" data-bs-title="Physical disk space used"
+                                              style="cursor: help;">Physical (Disk)</span>
+                                    </th>
+                                    <th class="text-right">
+                                        <span data-bs-toggle="tooltip" data-bs-title="Original uncompressed data size"
+                                              style="cursor: help;">Logical (Original)</span>
+                                    </th>
+                                    <th class="text-right">
+                                        <span data-bs-toggle="tooltip" data-bs-title="This directory's physical disk usage as % of total physical disk usage"
+                                              style="cursor: help;">% of Physical</span>
+                                    </th>
+                                    <th class="text-right">
+                                        <span data-bs-toggle="tooltip" data-bs-title="Data reduction ratio for this directory"
+                                              style="cursor: help;">DRR</span>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -218,6 +280,14 @@
 
                     subdirTable.addEventListener('hide.bs.collapse', function () {
                         toggleIcon.textContent = '▶';
+                    });
+
+                    // Initialize Bootstrap 5 tooltips
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                            return new bootstrap.Tooltip(tooltipTriggerEl);
+                        });
                     });
                 </script>
             </div>
