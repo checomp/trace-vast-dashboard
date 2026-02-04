@@ -39,6 +39,10 @@ else:
         'host': '0.0.0.0',
         'debug': 'true'
     }
+    config['shibboleth'] = {
+        'login_url': '/Shibboleth.sso/Login',
+        'logout_url': '/Shibboleth.sso/Logout'
+    }
     config['cache'] = {
         'ttl': '600'
     }

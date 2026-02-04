@@ -26,7 +26,12 @@ def dashboard():
 
     # In production mode (debug=false), require authentication
     if not app.debug and not current_user:
-        abort(403, "Authentication required")
+        # Redirect to Shibboleth login page
+        shibboleth_login = config.get('shibboleth', 'login_url', '/Shibboleth.sso/Login')
+        # Preserve the original URL to return to after login
+        return_url = request.url
+        login_url = f"{shibboleth_login}?target={return_url}"
+        return redirect(login_url)
 
     # Check if user is searching for someone else
     search_user = request.args.get('user', '').strip()

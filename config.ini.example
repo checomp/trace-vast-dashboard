@@ -13,8 +13,14 @@ key_file = ~/.ssh/id_rsa
 # Web server settings
 port = 5001
 host = 0.0.0.0
-# Set debug=false in production (disables user search feature)
+# Set debug=false in production (enables Shibboleth authentication, disables user search feature)
 debug = true
+
+[shibboleth]
+# Shibboleth authentication endpoints (used when debug=false)
+# These are standard paths when using Apache mod_shib
+login_url = /Shibboleth.sso/Login
+logout_url = /Shibboleth.sso/Logout
 
 [cache]
 ttl = 600
