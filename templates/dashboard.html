@@ -55,7 +55,20 @@
                     <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
                     {% endif %}
                 </table>
-
+                <h5 class="mt-4">Capacity Usage</h5>
+                <div class="progress usage-bar">
+                    <div class="progress-bar
+                        {% if quota.usage_percentage|float < 75 %}bg-success
+                        {% elif quota.usage_percentage|float < 90 %}bg-warning
+                        {% else %}bg-danger{% endif %}"
+                        role="progressbar"
+                        style="width: {{ quota.usage_percentage }}%"
+                        aria-valuenow="{{ quota.usage_percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100">
+                        {{ quota.usage_percentage }}%
+                    </div>
+                </div>
                 <h5 class="mt-4">
                     Quota Accounting
                     <span data-bs-toggle="tooltip" data-bs-placement="right"
@@ -140,21 +153,6 @@
                     </tr>
                     {% endif %}
                 </table>
-
-                <h5 class="mt-4">Capacity Usage</h5>
-                <div class="progress usage-bar">
-                    <div class="progress-bar
-                        {% if quota.usage_percentage|float < 75 %}bg-success
-                        {% elif quota.usage_percentage|float < 90 %}bg-warning
-                        {% else %}bg-danger{% endif %}"
-                        role="progressbar"
-                        style="width: {{ quota.usage_percentage }}%"
-                        aria-valuenow="{{ quota.usage_percentage }}"
-                        aria-valuemin="0"
-                        aria-valuemax="100">
-                        {{ quota.usage_percentage }}%
-                    </div>
-                </div>
 
                 {% if quota.usage_percentage|float >= 90 %}
                 <div class="alert alert-danger mt-3" role="alert">
