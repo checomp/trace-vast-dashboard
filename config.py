@@ -34,6 +34,11 @@ else:
         'host': 'trace.cmu.edu',
         'key_file': '~/.ssh/id_rsa'
     }
+    config['flask'] = {
+        'port': '5001',
+        'host': '0.0.0.0',
+        'debug': 'true'
+    }
     config['cache'] = {
         'ttl': '600'
     }
@@ -48,3 +53,6 @@ def get(section, key, fallback=None):
 
 def getint(section, key, fallback=None):
     return config.getint(section, key, fallback=fallback)
+
+def getboolean(section, key, fallback=None):
+    return config.getboolean(section, key, fallback=fallback)

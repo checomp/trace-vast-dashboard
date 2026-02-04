@@ -2,10 +2,11 @@
 import sys
 sys.path.insert(0, '/opt/vast-quota-web')
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from modules.auth import get_current_user, login_required
 from modules.vast_client import get_quota_for_user
 from modules.formatting import format_bytes, calculate_percentage
+import config
 import logging
 
 app = Flask(__name__)
@@ -21,16 +22,31 @@ logger = logging.getLogger(__name__)
 @app.route('/')
 @login_required
 def dashboard():
-    """Main dashboard showing user's quota."""
-    user = get_current_user()
-    logger.info(f"Dashboard accessed by user: {user}")
-    
+    """Main dashboard showing user's quota or search results."""
+    current_user = get_current_user()
+
+    # Check if user is searching for someone else
+    search_user = request.args.get('user', '').strip()
+
+    if search_user:
+        # Searching for another user
+        user = search_user
+        logger.info(f"User {current_user} searching for quota of: {user}")
+    else:
+        # Show current user's quota
+        user = current_user
+        logger.info(f"Dashboard accessed by user: {user}")
+
     # Get quota for user
     quota = get_quota_for_user(user)
     
     if not quota:
-        return render_template('error.html', 
-                             error_message="No quota found for your account.")
+        error_msg = f"No quota found for user '{user}'."
+        if search_user:
+            error_msg += " The user may not exist or may not have any Unix groups assigned."
+        return render_template('error.html',
+                             error_message=error_msg,
+                             show_back_button=bool(search_user))
     
     # Extract raw values (handle different API field name variants)
     hard_limit = quota.get('hard_limit')
@@ -104,7 +120,10 @@ def dashboard():
     }
 
     return render_template('dashboard.html',
-                         user=user,
+                         current_user=current_user,
+                         displayed_user=user,
+                         is_search=(search_user != ''),
+                         debug_mode=app.debug,
                          quota=quota_display)
 
 @app.route('/health')
@@ -129,4 +148,10 @@ def internal_error(e):
                          error_message="An internal error occurred."), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Get configuration from config file
+    port = config.getint('flask', 'port', 5001)
+    host = config.get('flask', 'host', '0.0.0.0')
+    debug = config.getboolean('flask', 'debug', True)
+
+    logger.info(f"Starting Flask app on {host}:{port} (debug={debug})")
+    app.run(debug=debug, host=host, port=port)

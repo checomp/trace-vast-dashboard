@@ -9,6 +9,13 @@ username = rwalsh
 host = trace.cmu.edu
 key_file = ~/.ssh/id_rsa
 
+[flask]
+# Web server settings
+port = 5001
+host = 0.0.0.0
+# Set debug=false in production (disables user search feature)
+debug = true
+
 [cache]
 ttl = 600
 
