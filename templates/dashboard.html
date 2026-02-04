@@ -81,8 +81,8 @@
                     <tr>
                         <th>
                             <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Logical data size that counts against your quota (same as Logical Capacity below)"
-                                  style="cursor: help; text-decoration: underline dotted;">
+                                  data-bs-title="What counts against your quota limit (~logical data size)"
+                                  style="cursor: help;">
                                 Used (Quota Accounting):
                             </span>
                         </th>
@@ -95,8 +95,8 @@
                     <tr>
                         <th>
                             <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Original uncompressed data size"
-                                  style="cursor: help; text-decoration: underline dotted;">
+                                  data-bs-title="Original uncompressed data size (same as Logical Capacity below)"
+                                  style="cursor: help;">
                                 Used (Logical):
                             </span>
                         </th>
@@ -110,7 +110,7 @@
                         <th>
                             <span data-bs-toggle="tooltip" data-bs-placement="right"
                                   data-bs-title="Data reduction ratio: Logical / Physical disk space"
-                                  style="cursor: help; text-decoration: underline dotted;">
+                                  style="cursor: help;">
                                 Data Reduction Ratio (DRR):
                             </span>
                         </th>
@@ -183,7 +183,7 @@
                     <strong>
                         <span data-bs-toggle="tooltip" data-bs-placement="right"
                               data-bs-title="Physical disk space used after compression and deduplication"
-                              style="cursor: help; text-decoration: underline dotted;">
+                              style="cursor: help;">
                             Physical Disk Used:
                         </span>
                     </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
@@ -191,7 +191,7 @@
                     <strong>
                         <span data-bs-toggle="tooltip" data-bs-placement="right"
                               data-bs-title="Original uncompressed data size (matches quota accounting above)"
-                              style="cursor: help; text-decoration: underline dotted;">
+                              style="cursor: help;">
                             Logical Capacity:
                         </span>
                     </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
@@ -199,7 +199,7 @@
                     <strong>
                         <span data-bs-toggle="tooltip" data-bs-placement="right"
                               data-bs-title="Unique data after removing duplicates (before compression)"
-                              style="cursor: help; text-decoration: underline dotted;">
+                              style="cursor: help;">
                             Unique Capacity:
                         </span>
                     </strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
