@@ -44,7 +44,7 @@
                 <table class="table table-sm">
                     <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
                     <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
-                    <tr><th>State:</th><td><span class="badge badge-success">{{ quota.state }}</span></td></tr>
+                    <tr><th>State:</th><td><span class="badge bg-success">{{ quota.state }}</span></td></tr>
                     {% if quota.cluster %}
                     <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
                     {% endif %}
@@ -177,17 +177,19 @@
                             </thead>
                             <tbody>
                                 {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
+                                {% if '/' not in subdir.path %}
                                 <tr>
                                     <td><code>{{ subdir.path }}</code></td>
                                     <td class="text-right">{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">
-                                        <span class="badge {% if subdir.percentage > 25 %}badge-warning{% else %}badge-secondary{% endif %}">
+                                        <span class="badge {% if subdir.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
                                             {{ "{:.1f}".format(subdir.percentage) }}%
                                         </span>
                                     </td>
                                     <td class="text-right">{{ "{:.2f}".format(subdir.drr) }}:1</td>
                                 </tr>
+                                {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
