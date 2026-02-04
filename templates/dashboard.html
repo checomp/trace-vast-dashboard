@@ -159,7 +159,7 @@
 
                 {% if quota.capacity_breakdown.subdirectories %}
                 <div class="mb-3">
-                    <button class="btn btn-sm btn-outline-primary" type="button" data-toggle="collapse" data-target="#subdirTable" aria-expanded="false" aria-controls="subdirTable">
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#subdirTable" aria-expanded="false" aria-controls="subdirTable" id="subdirToggleBtn">
                         <span id="toggleIcon">▶</span> Show Subdirectories ({{ quota.capacity_breakdown.subdirectories|length }})
                     </button>
                 </div>
@@ -199,12 +199,16 @@
                 {% endif %}
 
                 <script>
-                    // Toggle icon when collapse is shown/hidden
-                    $('#subdirTable').on('show.bs.collapse', function () {
-                        $('#toggleIcon').text('▼');
+                    // Toggle icon when collapse is shown/hidden (Bootstrap 5)
+                    const subdirTable = document.getElementById('subdirTable');
+                    const toggleIcon = document.getElementById('toggleIcon');
+
+                    subdirTable.addEventListener('show.bs.collapse', function () {
+                        toggleIcon.textContent = '▼';
                     });
-                    $('#subdirTable').on('hide.bs.collapse', function () {
-                        $('#toggleIcon').text('▶');
+
+                    subdirTable.addEventListener('hide.bs.collapse', function () {
+                        toggleIcon.textContent = '▶';
                     });
                 </script>
             </div>

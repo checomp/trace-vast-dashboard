@@ -19,8 +19,8 @@
         <div class="container">
             <a class="navbar-brand" href="/">VAST Quota Dashboard</a>
             <div class="navbar-nav ms-auto">
-                {% if user %}
-                <span class="navbar-text text-white">User: {{ user }}</span>
+                {% if current_user %}
+                <span class="navbar-text text-white">User: {{ current_user }}</span>
                 {% endif %}
             </div>
         </div>
