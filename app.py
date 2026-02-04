@@ -24,6 +24,13 @@ def dashboard():
     """Main dashboard showing user's quota or search results."""
     current_user = get_current_user()
 
+    # Check if user is searching for someone else
+    search_user = request.args.get('user', '').strip()
+
+    # In debug mode with no search query and no authenticated user, show search prompt
+    if app.debug and not search_user and not current_user:
+        return render_template('search_prompt.html', debug_mode=True)
+
     # In production mode (debug=false), require authentication
     if not app.debug and not current_user:
         # Redirect to Shibboleth login page
@@ -31,14 +38,8 @@ def dashboard():
         # Preserve the original URL to return to after login
         return_url = request.url
         login_url = f"{shibboleth_login}?target={return_url}"
+        logger.info(f"Redirecting to Shibboleth login: {login_url}")
         return redirect(login_url)
-
-    # Check if user is searching for someone else
-    search_user = request.args.get('user', '').strip()
-
-    # In debug mode with no search query and no authenticated user, show search prompt
-    if app.debug and not search_user and not current_user:
-        return render_template('search_prompt.html', debug_mode=True)
 
     if search_user:
         # Searching for another user
