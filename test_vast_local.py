@@ -4,7 +4,7 @@ Standalone script to test VAST connectivity and retrieve sample quota data.
 Run this on a machine that has network access to the VAST cluster.
 
 Usage:
-    python3 test_vast_local.py --user rwalsh --password 'PASSWORD' --address 172.19.16.30
+    python3 test_vast_local.py --login-user rwalsh --password 'PASSWORD' --address 172.19.16.30 --search-user jdoe
 
 This will output JSON data that can be used to test the Flask app.
 """
@@ -12,33 +12,139 @@ This will output JSON data that can be used to test the Flask app.
 import argparse
 import json
 import sys
-from vastpy import VASTClient
+import os
 
-def test_vast_connection(user, password, address):
-    """Test VAST connection and retrieve sample quota data."""
+# Add parent directory to path to import modules
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from vastpy import VASTClient
+from modules import vast_client
+
+
+def test_user_groups_and_quota(search_username):
+    """
+    Test fetching user groups and quota from VAST API using vast_client functions.
+
+    Args:
+        search_username: The username to search for and query
+
+    Returns:
+        dict: Combined user groups and quota information
+    """
+    print("\n" + "=" * 60)
+    print(f"Testing User Groups & Quota API for: {search_username}")
+    print("=" * 60)
+
+    try:
+        # Use vast_client.get_user_groups() instead of duplicating code
+        print(f"\nQuerying VAST for user '{search_username}'...")
+        user_info = vast_client.get_user_groups(search_username)
+
+        if not user_info:
+            print(f"✗ User '{search_username}' not found in VAST")
+            return None
+
+        print(f"✓ Found user '{search_username}'")
+
+        # Display user information
+        print("\nUser Information:")
+        print(f"  Username: {user_info.get('username', 'N/A')}")
+        print(f"  Name: {user_info.get('name', 'N/A')}")
+        print(f"  UID: {user_info.get('uid', 'N/A')}")
+        print(f"  Primary Group: {user_info.get('primary_group_name', 'N/A')}")
+        print(f"  Leading Group: {user_info.get('leading_group_name', 'N/A')}")
+
+        # Display groups
+        groups = user_info.get('groups', [])
+        print(f"\nGroup Memberships ({len(groups)} groups):")
+        if groups:
+            for i, group in enumerate(groups, 1):
+                print(f"  {i}. {group}")
+        else:
+            print("  (no groups)")
+
+        # Display GIDs
+        gids = user_info.get('gids', [])
+        if gids:
+            print(f"\nGroup IDs (GIDs): {', '.join(map(str, gids))}")
+
+        # Get quota information using vast_client.get_user_quota()
+        quota_ids = user_info.get('quota_ids', [])
+        quota_data = None
+
+        if quota_ids:
+            print(f"\n✓ User has {len(quota_ids)} quota(s)")
+            print(f"  Quota IDs: {quota_ids}")
+
+            # Fetch quota details using vast_client function
+            try:
+                print(f"\nFetching quota details for user '{search_username}'...")
+                quota_data = vast_client.get_user_quota(search_username)
+
+                if quota_data:
+                    print(f"✓ Retrieved quota: {quota_data.get('name', 'N/A')}")
+                    print(f"  Path: {quota_data.get('path', 'N/A')}")
+
+                    hard_limit = quota_data.get('hard_limit', 0)
+                    used_effective = quota_data.get('used_effective_capacity', 0)
+
+                    if hard_limit:
+                        usage_pct = (used_effective / hard_limit * 100) if hard_limit > 0 else 0
+                        print(f"  Usage: {used_effective / (1024**4):.2f} TB / {hard_limit / (1024**4):.2f} TB ({usage_pct:.1f}%)")
+            except Exception as e:
+                print(f"⚠ Could not fetch quota details: {e}")
+        else:
+            print("\n⚠ User has no quotas assigned")
+
+        return {
+            'user_info': user_info,
+            'quota': quota_data
+        }
+
+    except Exception as e:
+        print(f"✗ Error querying user: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def test_vast_connection(login_user, password, address, search_user):
+    """
+    Test VAST connection and retrieve sample quota data.
+
+    Args:
+        login_user: Username for VAST API authentication
+        password: Password for VAST API authentication
+        address: VAST cluster address
+        search_user: Username to search for and query
+    """
     print("=" * 60)
     print("VAST Connectivity Test")
     print("=" * 60)
-    print(f"\nConnecting to VAST at {address} as user {user}...")
-    
+    print(f"\nLogin user (authentication): {login_user}")
+    print(f"Search user (querying): {search_user}")
+    print(f"Connecting to VAST at {address}...")
+
     try:
-        # Create client
-        client = VASTClient(
-            user=user,
+        # Create client and configure vast_client module to use it
+        from modules.vast_client import _client
+        vast_client._client = VASTClient(
+            user=login_user,
             password=password,
             address=address
         )
         print("✓ Successfully connected to VAST")
-        
+
         # Get quotas list
         print("\nRetrieving quotas list...")
+        client = vast_client.get_vast_client()
         quotas = client.quotas.get()
         print(f"✓ Found {len(quotas)} quotas")
-        
+
         if len(quotas) == 0:
             print("\n⚠ No quotas found!")
             return None
-        
+
         # Display first 10 quotas
         print("\nFirst 10 quotas:")
         print("-" * 60)
@@ -58,57 +164,26 @@ def test_vast_connection(user, password, address):
                 print(f"   Path: {path}")
                 print(f"   Used: {used_tb:.2f} TB (no limit)")
             print()
-        
+
         # Get detailed info for first quota
         first_quota = quotas[0]
         quota_name = first_quota.get('name', 'unknown')
-        quota_path = first_quota.get('path', '/')
-        
+
         print("=" * 60)
         print(f"Detailed information for first quota: {quota_name}")
         print("=" * 60)
-        
-        # Format quota data for Flask app
-        quota_data = {
-            'name': first_quota.get('name'),
-            'path': first_quota.get('path'),
-            'guid': first_quota.get('guid'),
-            'state': first_quota.get('state'),
-            'hard_limit': first_quota.get('hard_limit'),
-            'soft_limit': first_quota.get('soft_limit'),
-            'used_effective': first_quota.get('used_effective_capacity'),
-            'used_logical': first_quota.get('used_logical_capacity'),
-            'used_effective_tb': first_quota.get('used_effective_capacity_tb'),
-            'used_logical_tb': first_quota.get('used_logical_capacity_tb'),
-        }
-        
         print("\nQuota Information:")
-        print(json.dumps(quota_data, indent=2))
-        
-        # Try to get capacity breakdown
-        print("\n" + "=" * 60)
-        print("Attempting to get capacity breakdown...")
-        print("=" * 60)
-        
-        try:
-            # Get capacity breakdown by directory
-            # This might use a different API endpoint
-            print(f"\nQuerying capacity for path: {quota_path}")
-            
-            # Try using the capacity API if available
-            # Note: This is a guess at the API - adjust based on vastpy documentation
-            # capacities = client.capacity.get(path=quota_path)
-            
-            print("\n⚠ Capacity breakdown API call not implemented yet")
-            print("  (Will be added based on vastpy API documentation)")
-            
-        except Exception as e:
-            print(f"\n⚠ Could not retrieve capacity breakdown: {e}")
-        
+        print(json.dumps(first_quota, indent=2))
+
+        # Test user groups and quota functionality
+        user_data = test_user_groups_and_quota(search_user)
+
         # Save output to file
         output_file = 'vast_test_output.json'
         output_data = {
-            'quota': quota_data,
+            'login_user': login_user,
+            'search_user': search_user,
+            'first_quota': first_quota,
             'all_quotas_count': len(quotas),
             'sample_quotas': [
                 {
@@ -117,43 +192,56 @@ def test_vast_connection(user, password, address):
                     'used_tb': q.get('used_effective_capacity_tb', 0)
                 }
                 for q in quotas[:10]
-            ]
+            ],
+            'search_user_data': user_data
         }
-        
+
         with open(output_file, 'w') as f:
             json.dump(output_data, f, indent=2)
-        
+
         print("\n" + "=" * 60)
         print(f"✓ Test output saved to: {output_file}")
         print("=" * 60)
         print("\nCopy the contents of this file and provide it for testing the Flask app.")
-        
+
         return output_data
-        
+
     except Exception as e:
         print(f"\n✗ Error: {e}")
         import traceback
         traceback.print_exc()
         return None
 
+
 def main():
     parser = argparse.ArgumentParser(
         description='Test VAST connectivity and retrieve sample data'
     )
-    parser.add_argument('--user', required=True, help='VAST username')
-    parser.add_argument('--password', required=True, help='VAST password')
-    parser.add_argument('--address', required=True, help='VAST cluster address')
-    
+    parser.add_argument('--login-user', required=True,
+                       help='VAST username for authentication')
+    parser.add_argument('--password', required=True,
+                       help='VAST password for authentication')
+    parser.add_argument('--address', required=True,
+                       help='VAST cluster address')
+    parser.add_argument('--search-user', required=True,
+                       help='Username to search for and query')
+
     args = parser.parse_args()
-    
-    result = test_vast_connection(args.user, args.password, args.address)
-    
+
+    result = test_vast_connection(
+        args.login_user,
+        args.password,
+        args.address,
+        args.search_user
+    )
+
     if result:
         print("\n✓ Test completed successfully!")
         sys.exit(0)
     else:
         print("\n✗ Test failed!")
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

@@ -1,217 +1,273 @@
-# VAST Quota Dashboard
+# VAST Quota Web Dashboard
 
-Web application for displaying VAST storage quota information with CMU Shibboleth authentication.
+Web application for viewing VAST storage quota information with Shibboleth authentication and group-based access control.
 
-## Architecture
+## Features
 
-- **Web Server**: Apache httpd 2.4 with mod_ssl and mod_wsgi
-- **Authentication**: Shibboleth SP 3.x (CMU SSO)
-- **Application**: Flask 3.0
-- **Storage API**: VAST API via vastpy library
-- **Frontend**: Bootstrap 5.3 with responsive design
+- **Shibboleth Authentication**: Integrates with CMU's authentication system
+- **VAST API Integration**: Queries user groups and quota information from VAST storage
+- **Group-Based Access Control**: Supports role-based authorization using VAST groups
+- **User Quota Display**: Shows storage usage and limits for authenticated users
 
-## Directory Structure
+## Project Structure
 
 ```
-/opt/vast-quota-web/
-├── app.py                      # Main Flask application
-├── wsgi.py                     # WSGI entry point
-├── config.py                   # Configuration loader
-├── requirements.txt            # Python dependencies
-├── test_vast_local.py          # Standalone VAST connectivity test
+vast-quota-web/
+├── app.py                  # Main Flask application
+├── config.ini              # Configuration file (not in git)
 ├── modules/
-│   ├── __init__.py
-│   ├── auth.py                 # Authentication decorators
-│   ├── vast_client.py          # VAST API wrapper
-│   ├── group_service.py        # Group membership service
-│   ├── formatting.py           # Data formatting utilities
-│   └── cache.py                # Caching wrapper
-├── templates/
-│   ├── base.html               # Base template
-│   ├── dashboard.html          # Main quota dashboard
-│   ├── quota_detail.html       # Detailed quota view
-│   └── error.html              # Error pages
-├── static/
-│   ├── css/custom.css          # Custom styles
-│   ├── js/charts.js            # Chart.js configurations
-│   └── img/                    # Logos, icons
-└── logs/
-    └── app.log                 # Application logs
-```
+│   ├── auth.py            # Authentication and authorization
+│   ├── vast_client.py     # VAST API client wrapper
+│   └── config.py          # Configuration management
+├── templates/             # HTML templates
+├── static/                # Static assets (CSS, JS, images)
+├── test_vast_local.py     # Standalone VAST API test script
+└── test_user_groups.py    # Unit tests for user groups
 
-## Testing VAST Connectivity
+## Prerequisites
 
-Since the production server cannot access the VAST cluster directly, use the standalone test script on a machine with network access:
-
-### Step 1: Run test script locally
-
-```bash
-# On a machine with VAST network access:
-python3 test_vast_local.py --user rwalsh --password 'YOUR_PASSWORD' --address 172.19.16.30
-```
-
-This will:
-- Test connection to VAST
-- List available quotas
-- Retrieve detailed information for the first quota
-- Save output to `vast_test_output.json`
-
-### Step 2: Provide output for testing
-
-Copy the contents of `vast_test_output.json` and provide it to test the Flask app HTML rendering.
-
-## Configuration
-
-### VAST Credentials
-
-Stored in `/etc/vast-quota.conf`:
-
-```ini
-[vast]
-address = 172.19.16.30
-username = rwalsh
-password = YOUR_PASSWORD
-timeout = 30
-
-[cache]
-ttl = 600  # 10 minutes
-
-[logging]
-level = INFO
-file = /opt/vast-quota-web/logs/app.log
-```
-
-**Security**: File permissions should be `640` (root:apache)
-
-### Apache Configuration
-
-Location: `/etc/httpd/conf.d/vast-quota.conf`
-
-**IMPORTANT**: Authentication is currently disabled for testing.
-
-#### Re-enabling Shibboleth Authentication
-
-1. Edit `/etc/httpd/conf.d/vast-quota.conf`
-2. Uncomment the three Shibboleth Location blocks (lines ~40-54)
-3. Comment out or remove the "Public access for testing" block (line ~60)
-4. Edit `/opt/vast-quota-web/modules/auth.py`
-5. Remove or comment out the "TESTING MODE" block (lines ~9-12)
-6. Restart Apache: `sudo systemctl restart httpd`
+- Python 3.8+
+- Network access to VAST cluster
+- VAST API credentials
 
 ## Installation
 
-### Prerequisites
+### On Remote Server (Production)
 
+1. Clone the repository:
 ```bash
-# Install base packages
-sudo dnf install -y httpd mod_ssl python3-mod_wsgi shibboleth python3-pip
-
-# Install Python dependencies
-sudo pip3 install -r requirements.txt
+git clone <repository-url>
+cd vast-quota-web
 ```
 
-### SSL Certificate
-
-Currently using Sectigo InCommon certificate via certbot:
-
+2. Create virtual environment:
 ```bash
-sudo certbot --apache -d trace-vast-dashboard.cheme.local.cmu.edu \
-  --server https://acme.sectigo.com/v2/InCommonRSAOV \
-  --eab-kid YOUR_KID \
-  --eab-hmac-key YOUR_HMAC
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-### Shibboleth Registration
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-**Status**: Pending CMU IdP approval
+4. Create `config.ini`:
+```ini
+[vast]
+username = your_vast_username
+password = your_vast_password
+address = your.vast.cluster.address
+```
 
-Registration files:
-- SP Certificate: `/etc/shibboleth/sp-cert.pem`
-- SP Metadata: `~/sp-metadata.xml`
-- Entity ID: `https://trace-vast-dashboard.cheme.local.cmu.edu/shibboleth`
+5. Run the application:
+```bash
+python app.py
+```
 
-## Service Management
+### On Local Mac (For Testing)
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd vast-quota-web
+```
+
+2. Create virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install dependencies:
+```bash
+pip install vastpy flask
+```
+
+4. Test VAST connectivity:
+```bash
+python3 test_vast_local.py \
+  --login-user your_username \
+  --password 'your_password' \
+  --address 172.19.16.30 \
+  --search-user username_to_query
+```
+
+This will:
+- Authenticate to VAST API with `--login-user` credentials
+- Query information for `--search-user`
+- Display user groups and quota information
+- Save results to `vast_test_output.json`
+
+5. Run the Flask app locally:
+```bash
+# Set VAST credentials
+export VAST_USERNAME=your_username
+export VAST_PASSWORD=your_password
+export VAST_ADDRESS=172.19.16.30
+
+# Run app
+python app.py
+```
+
+The app will be available at `http://localhost:5000`
+
+**Note for Mac Users**: Ensure you have network connectivity to the VAST cluster. You may need to be on VPN or the campus network.
+
+## Testing
+
+### Test VAST API Functions
 
 ```bash
-# Start services
-sudo systemctl start httpd shibd
+# Test user groups functionality
+python3 test_user_groups.py
 
-# Enable on boot
-sudo systemctl enable httpd shibd
+# Test with specific user
+python3 test_user_groups.py --user username
 
-# Restart after config changes
-sudo systemctl restart httpd shibd
+# Test VAST connectivity and quota
+python3 test_vast_local.py \
+  --login-user admin_user \
+  --password 'admin_password' \
+  --address 172.19.16.30 \
+  --search-user test_user
+```
 
-# Check status
-sudo systemctl status httpd shibd
+### Test Flask App
 
-# View logs
-sudo tail -f /var/log/httpd/vast-quota-error.log
-sudo tail -f /opt/vast-quota-web/logs/app.log
-sudo tail -f /var/log/shibboleth/shibd.log
+```bash
+# Run Flask in development mode
+FLASK_ENV=development python app.py
+```
+
+## Configuration
+
+### VAST Connection
+
+Edit `config.ini`:
+
+```ini
+[vast]
+username = vast_api_username
+password = vast_api_password
+address = vast.cluster.address
+```
+
+### Authentication Mode
+
+The application supports two modes:
+
+**Production Mode** (Shibboleth):
+- Requires Apache/Shibboleth configuration
+- Extracts user from `REMOTE_USER` environment variable
+
+**Testing Mode** (in `modules/auth.py`):
+```python
+# ===== TESTING MODE =====
+if not eppn:
+    return 'rwalsh'  # Test user
+# ===== END TESTING MODE =====
+```
+
+To disable testing mode, comment out or remove this block.
+
+## API Functions
+
+### `get_user_groups(username)`
+
+Query user information from VAST API.
+
+```python
+from modules.vast_client import get_user_groups
+
+user_info = get_user_groups('rwalsh')
+# Returns:
+# {
+#     'username': 'rwalsh',
+#     'groups': ['users', 'developers'],
+#     'gids': [1000, 2000],
+#     'quota_ids': [123, 456],
+#     ...
+# }
+```
+
+### `get_user_quota(username)`
+
+Get quota information for a user. Returns the full quota object from VAST API.
+
+```python
+from modules.vast_client import get_user_quota
+
+quota = get_user_quota('rwalsh')
+# Returns full quota object with all fields from VAST API
+```
+
+### Group-Based Authorization
+
+```python
+from modules.auth import require_group, user_in_group
+
+# Decorator for route protection
+@app.route('/admin')
+@require_group('admins')
+def admin_page():
+    return "Admin content"
+
+# Check membership programmatically
+if user_in_group('developers'):
+    # User is in developers group
+    pass
 ```
 
 ## Development
 
-### Testing without VAST Access
+### Adding New Features
 
-Since the production server can't access VAST, you can:
-
-1. Run `test_vast_local.py` on a machine with VAST access
-2. Use the JSON output to create mock data
-3. Test Flask app rendering with mock data
-
-### Local Development Server
-
+1. Create feature branch:
 ```bash
-cd /opt/vast-quota-web
-export FLASK_APP=app.py
-export FLASK_ENV=development
-flask run --host=0.0.0.0 --port=5000
+git checkout -b feature/your-feature
 ```
 
-**Note**: This bypasses Apache and Shibboleth. For full testing, use Apache with authentication disabled.
+2. Make changes and test:
+```bash
+python3 test_user_groups.py
+python3 test_vast_local.py --login-user admin --password pwd --address 172.19.16.30 --search-user testuser
+```
 
-## Future Enhancements
+3. Commit changes:
+```bash
+git add .
+git commit -m "Add your feature"
+```
 
-- [ ] Implement proper user-to-quota mapping via VAST views API
-- [ ] Add Chart.js visualizations for quota usage
-- [ ] Implement subdirectory capacity breakdown
-- [ ] Add caching layer with Flask-Caching
-- [ ] Migrate to read-only VAST service account
-- [ ] Add email alerts at 90% usage
-- [ ] Historical usage trends
-- [ ] Mobile responsiveness testing
+4. Push and create PR:
+```bash
+git push origin feature/your-feature
+```
 
 ## Troubleshooting
 
-### Common Issues
+### VAST Connection Issues
 
-1. **Shibboleth errors**: Check `/var/log/shibboleth/shibd.log`
-2. **WSGI errors**: Check `/var/log/httpd/vast-quota-error.log`
-3. **Permission denied**: Check SELinux contexts and file permissions
-4. **VAST connection timeout**: Verify network connectivity and credentials
+1. **Connection timeout**: Verify network connectivity to VAST cluster
+2. **Authentication failed**: Check username/password in config.ini
+3. **User not found**: Ensure username exists in VAST system
 
-### SELinux
+### Testing from Mac
 
-If SELinux is enforcing:
+1. **Network connectivity**: Ensure you're on CMU network or VPN
+2. **Python version**: Use Python 3.8 or higher
+3. **Dependencies**: Install vastpy: `pip install vastpy`
 
-```bash
-# Allow Apache to connect to network (for VAST API)
-sudo setsebool -P httpd_can_network_connect 1
+### Flask App Issues
 
-# Set proper contexts
-sudo semanage fcontext -a -t httpd_sys_content_t "/opt/vast-quota-web(/.*)?"
-sudo semanage fcontext -a -t httpd_sys_rw_content_t "/opt/vast-quota-web/logs(/.*)?"
-sudo restorecon -Rv /opt/vast-quota-web
-```
-
-## Support
-
-- Email: checomp@andrew.cmu.edu
-- Server: trace-vast-dashboard.cheme.local.cmu.edu
-- RHEL 9.6
+1. **Config file not found**: Create `config.ini` in project root
+2. **Module import errors**: Ensure you're in virtual environment
+3. **VAST API errors**: Check credentials and network connectivity
 
 ## License
 
-Internal CMU ChemE use only.
+[Add your license here]
+
+## Contributors
+
+- Ryan Walsh (@rwalsh)
