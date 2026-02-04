@@ -183,10 +183,10 @@
                 {% endfor %}
                 <div class="mb-3">
                     <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#subdirTable" aria-expanded="true" aria-controls="subdirTable" id="subdirToggleBtn">
-                        <span id="toggleIcon">▶</span> Show Top-Level Subdirectories ({{ top_level_count.value }})
+                        <span id="toggleIcon">▼</span> Show Top-Level Subdirectories ({{ top_level_count.value }})
                     </button>
                 </div>
-                <div class="collapse" id="subdirTable">
+                <div class="collapse show" id="subdirTable">
                     <div class="table-responsive">
                         <table class="table table-sm table-striped table-hover">
                             <thead class="thead-dark">
