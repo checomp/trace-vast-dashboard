@@ -36,13 +36,30 @@ def dashboard():
     hard_limit = quota.get('hard_limit')
     soft_limit = quota.get('soft_limit')
     used_effective = quota.get('used_effective_capacity') or quota.get('used_effective')
-    used_logical = quota.get('used_logical_capacity') or quota.get('used_logical')
+
+    # Get logical capacity from capacity breakdown root if available
+    capacity_breakdown = quota.get('capacity_breakdown')
+    used_logical = None
+    if capacity_breakdown and capacity_breakdown.get('root'):
+        used_logical = capacity_breakdown['root'].get('logical_bytes')
+
+    # Inode information
+    used_inodes = quota.get('used_inodes')
+    soft_limit_inodes = quota.get('soft_limit_inodes')
+    hard_limit_inodes = quota.get('hard_limit_inodes')
 
     # Calculate usage percentage
     if hard_limit and used_effective:
         usage_pct = calculate_percentage(used_effective, hard_limit)
     else:
         usage_pct = 0
+
+    # Calculate inode usage percentage
+    inode_usage_pct = 0
+    if hard_limit_inodes and used_inodes:
+        inode_usage_pct = calculate_percentage(used_inodes, hard_limit_inodes)
+    elif soft_limit_inodes and used_inodes:
+        inode_usage_pct = calculate_percentage(used_inodes, soft_limit_inodes)
 
     # Calculate DRR
     from modules.formatting import calculate_drr
@@ -54,18 +71,26 @@ def dashboard():
         'path': quota.get('path'),
         'guid': quota.get('guid'),
         'state': quota.get('state'),
+        'cluster': quota.get('cluster'),
+        'tenant_name': quota.get('tenant_name'),
 
         # Formatted capacity values
         'hard_limit': format_bytes(hard_limit),
         'soft_limit': format_bytes(soft_limit),
         'used_effective': format_bytes(used_effective),
-        'used_logical': format_bytes(used_logical),
+        'used_logical': format_bytes(used_logical) if used_logical else 'N/A',
 
         # Raw byte values
         'hard_limit_bytes': hard_limit,
         'soft_limit_bytes': soft_limit,
         'used_effective_bytes': used_effective,
         'used_logical_bytes': used_logical,
+
+        # Inode information
+        'used_inodes': f"{used_inodes:,}" if used_inodes else 'N/A',
+        'soft_limit_inodes': f"{soft_limit_inodes:,}" if soft_limit_inodes else 'No limit',
+        'hard_limit_inodes': f"{hard_limit_inodes:,}" if hard_limit_inodes else 'No limit',
+        'inode_usage_percentage': f"{inode_usage_pct:.1f}" if inode_usage_pct > 0 else None,
 
         # Calculations
         'usage_percentage': f"{usage_pct:.1f}",
@@ -75,7 +100,7 @@ def dashboard():
         'grace_period': quota.get('grace_period'),
 
         # Capacity breakdown
-        'capacity_breakdown': quota.get('capacity_breakdown')
+        'capacity_breakdown': capacity_breakdown
     }
 
     return render_template('dashboard.html',

@@ -22,6 +22,12 @@
                     <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
                     <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
                     <tr><th>State:</th><td><span class="badge badge-success">{{ quota.state }}</span></td></tr>
+                    {% if quota.cluster %}
+                    <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
+                    {% endif %}
+                    {% if quota.tenant_name %}
+                    <tr><th>Tenant:</th><td>{{ quota.tenant_name }}</td></tr>
+                    {% endif %}
                     {% if quota.grace_period %}
                     <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
                     {% endif %}
@@ -67,7 +73,29 @@
                     </tr>
                 </table>
 
-                <h5 class="mt-4">Usage</h5>
+                <h5 class="mt-4">Inode Information (File Count)</h5>
+                <table class="table table-sm">
+                    <tr>
+                        <th>Used Inodes:</th>
+                        <td>{{ quota.used_inodes }}</td>
+                    </tr>
+                    <tr>
+                        <th>Soft Limit:</th>
+                        <td>{{ quota.soft_limit_inodes }}</td>
+                    </tr>
+                    <tr>
+                        <th>Hard Limit:</th>
+                        <td>{{ quota.hard_limit_inodes }}</td>
+                    </tr>
+                    {% if quota.inode_usage_percentage %}
+                    <tr>
+                        <th>Usage:</th>
+                        <td>{{ quota.inode_usage_percentage }}%</td>
+                    </tr>
+                    {% endif %}
+                </table>
+
+                <h5 class="mt-4">Capacity Usage</h5>
                 <div class="progress usage-bar">
                     <div class="progress-bar
                         {% if quota.usage_percentage|float < 75 %}bg-success
@@ -97,41 +125,65 @@
                 {% if quota.capacity_breakdown.root %}
                 <div class="alert alert-info">
                     <strong>Root Path:</strong> <code>{{ quota.capacity_breakdown.root.path }}</code><br>
-                    <strong>Effective Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB<br>
-                    <strong>Logical Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB<br>
+                    <strong>Effective Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**4)) }} TB
+                    ({{ "{:,.0f}".format(quota.capacity_breakdown.root.usable_bytes / (1024**3)) }} GB)<br>
+                    <strong>Logical Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**4)) }} TB
+                    ({{ "{:,.0f}".format(quota.capacity_breakdown.root.logical_bytes / (1024**3)) }} GB)<br>
+                    <strong>Unique Capacity:</strong> {{ "{:,.2f}".format(quota.capacity_breakdown.root.unique_bytes / (1024**4)) }} TB<br>
                     <strong>DRR:</strong> {{ "{:.2f}".format(quota.capacity_breakdown.root.drr) }}:1
                 </div>
                 {% endif %}
 
                 {% if quota.capacity_breakdown.subdirectories %}
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th>Path</th>
-                                <th>Effective</th>
-                                <th>Logical</th>
-                                <th>% of Quota</th>
-                                <th>DRR</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for subdir in quota.capacity_breakdown.subdirectories %}
-                            <tr>
-                                <td><code>{{ subdir.path }}</code></td>
-                                <td>{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
-                                <td>{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
-                                <td>{{ "{:.2f}".format(subdir.percentage) }}%</td>
-                                <td>{{ "{:.2f}".format(subdir.drr) }}:1</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="mb-3">
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-toggle="collapse" data-target="#subdirTable" aria-expanded="false" aria-controls="subdirTable">
+                        <span id="toggleIcon">▶</span> Show Subdirectories ({{ quota.capacity_breakdown.subdirectories|length }})
+                    </button>
+                </div>
+                <div class="collapse" id="subdirTable">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Subdirectory Path</th>
+                                    <th class="text-right">Effective</th>
+                                    <th class="text-right">Logical</th>
+                                    <th class="text-right">% of Total</th>
+                                    <th class="text-right">DRR</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
+                                <tr>
+                                    <td><code>{{ subdir.path }}</code></td>
+                                    <td class="text-right">{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
+                                    <td class="text-right">{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
+                                    <td class="text-right">
+                                        <span class="badge {% if subdir.percentage > 25 %}badge-warning{% else %}badge-secondary{% endif %}">
+                                            {{ "{:.1f}".format(subdir.percentage) }}%
+                                        </span>
+                                    </td>
+                                    <td class="text-right">{{ "{:.2f}".format(subdir.drr) }}:1</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 {% else %}
                 <p class="text-muted"><em>No subdirectories found</em></p>
                 {% endif %}
                 {% endif %}
+
+                <script>
+                    // Toggle icon when collapse is shown/hidden
+                    $('#subdirTable').on('show.bs.collapse', function () {
+                        $('#toggleIcon').text('▼');
+                    });
+                    $('#subdirTable').on('hide.bs.collapse', function () {
+                        $('#toggleIcon').text('▶');
+                    });
+                </script>
             </div>
         </div>
     </div>
