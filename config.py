@@ -3,9 +3,22 @@ import configparser
 import os
 
 config = configparser.ConfigParser()
-config_file = os.environ.get('VAST_QUOTA_CONFIG', '/etc/vast-quota.conf')
 
-if os.path.exists(config_file):
+# Look for config in multiple locations (in order of priority)
+config_locations = [
+    os.environ.get('VAST_QUOTA_CONFIG', ''),
+    '/opt/vast-quota-web/config.ini',
+    os.path.expanduser('~/.vast-quota.ini'),
+    '/etc/vast-quota.conf'
+]
+
+config_file = None
+for location in config_locations:
+    if location and os.path.exists(location):
+        config_file = location
+        break
+
+if config_file:
     config.read(config_file)
 else:
     # Default configuration for testing

@@ -1,0 +1,12 @@
+[vast]
+username = your_vast_username
+password = your_vast_password
+address = 172.19.16.30
+timeout = 30
+
+[cache]
+ttl = 600
+
+[logging]
+level = INFO
+file = /opt/vast-quota-web/logs/app.log

@@ -4,6 +4,10 @@ Standalone script to test VAST connectivity and retrieve sample quota data.
 Run this on a machine that has network access to the VAST cluster.
 
 Usage:
+    # Using credentials from config.py (recommended)
+    python3 test_vast_local.py --search-user jdoe
+
+    # Or override with CLI arguments
     python3 test_vast_local.py --login-user rwalsh --password 'PASSWORD' --address 172.19.16.30 --search-user jdoe
 
 This will output JSON data that can be used to test the Flask app.
@@ -19,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from vastpy import VASTClient
 from modules import vast_client
+import config
 
 
 def test_user_groups_and_quota(search_username):
@@ -217,21 +222,33 @@ def main():
     parser = argparse.ArgumentParser(
         description='Test VAST connectivity and retrieve sample data'
     )
-    parser.add_argument('--login-user', required=True,
-                       help='VAST username for authentication')
-    parser.add_argument('--password', required=True,
-                       help='VAST password for authentication')
-    parser.add_argument('--address', required=True,
-                       help='VAST cluster address')
+    parser.add_argument('--login-user',
+                       help='VAST username for authentication (default: from config.py)')
+    parser.add_argument('--password',
+                       help='VAST password for authentication (default: from config.py)')
+    parser.add_argument('--address',
+                       help='VAST cluster address (default: from config.py)')
     parser.add_argument('--search-user', required=True,
                        help='Username to search for and query')
 
     args = parser.parse_args()
 
+    # Get credentials from config.py with CLI overrides
+    login_user = args.login_user or config.get('vast', 'username')
+    password = args.password or config.get('vast', 'password')
+    address = args.address or config.get('vast', 'address')
+
+    if not login_user or not password or not address:
+        print("Error: VAST credentials not found in config.py and not provided via CLI")
+        print("Either:")
+        print("  1. Ensure config.py or /etc/vast-quota.conf is configured, OR")
+        print("  2. Provide --login-user, --password, and --address arguments")
+        sys.exit(1)
+
     result = test_vast_connection(
-        args.login_user,
-        args.password,
-        args.address,
+        login_user,
+        password,
+        address,
         args.search_user
     )
 
