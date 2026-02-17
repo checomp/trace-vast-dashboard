@@ -2,15 +2,68 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block head %}
+<style>
+@media print {
+    /* Hide navigation, buttons, debug panels, and footer */
+    nav.navbar,
+    .btn,
+    .card-header .btn,
+    #pdfToolbar,
+    .alert a,
+    form { display: none !important; }
+
+    body { padding-top: 0 !important; }
+
+    /* Make sure tables are fully visible */
+    .collapse { display: block !important; }
+    .table-responsive { overflow: visible !important; }
+
+    /* Show all child rows */
+    tr[class^="child-"] { display: table-row !important; }
+
+    /* Page break control */
+    .card { page-break-inside: avoid; }
+    h5 { page-break-after: avoid; }
+
+    /* Clean look */
+    .badge { border: 1px solid #999; }
+    .progress { border: 1px solid #ccc; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-12">
         <h1 class="mt-4">Storage Quota Information</h1>
         {% if is_search %}
-        <p class="lead">Quota information for: <strong>{{ displayed_user }}</strong> <a href="/" class="btn btn-sm btn-secondary ml-2">← Back to My Quota</a></p>
+        <p class="lead">Quota information for: <strong>{{ displayed_user }}</strong> <a href="/dashboard" class="btn btn-sm btn-secondary ml-2">← Back to Dashboard</a></p>
         {% else %}
-        <p class="lead">Your current storage quota usage</p>
+        <p class="lead">Your current storage quota usage <a href="/dashboard" class="btn btn-sm btn-secondary ml-2">← Back to Dashboard</a></p>
         {% endif %}
+
+        <div id="pdfToolbar" class="mb-3">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    ⬇ Save as PDF
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item" href="#" onclick="printPDF('collapsed'); return false;">
+                            <strong>Collapsed subdirectories</strong>
+                            <div class="text-muted" style="font-size:0.85em;">Top-level dirs only (children hidden)</div>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" onclick="printPDF('expanded'); return false;">
+                            <strong>Expanded subdirectories</strong>
+                            <div class="text-muted" style="font-size:0.85em;">All subdirectories shown</div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -20,11 +73,12 @@
         <div class="card bg-light">
             <div class="card-body">
                 <h6 class="card-title">🔍 Search User Quota <span class="badge badge-warning">Debug Mode</span></h6>
-                <form method="get" action="/" class="form-inline">
+                <form method="get" action="/dashboard" class="form-inline">
                     <input type="text" name="user" class="form-control mr-2" placeholder="Enter Andrew ID" required>
+                    <input type="hidden" name="fetch" value="true">
                     <button type="submit" class="btn btn-primary">Search</button>
                     {% if is_search %}
-                    <a href="/" class="btn btn-outline-secondary ml-2">Clear</a>
+                    <a href="/dashboard" class="btn btn-outline-secondary ml-2">Clear</a>
                     {% endif %}
                 </form>
             </div>
@@ -292,6 +346,45 @@
                             return new bootstrap.Tooltip(tooltipTriggerEl);
                         });
                     });
+
+                    // Save as PDF
+                    function printPDF(mode) {
+                        var allChildRows = document.querySelectorAll('tr[class^="child-"]');
+                        var previousDisplayStates = [];
+
+                        if (mode === 'expanded') {
+                            // Expand all child rows and update icons
+                            allChildRows.forEach(function(row) {
+                                previousDisplayStates.push(row.style.display);
+                                row.style.display = 'table-row';
+                            });
+                            // Set all expand icons to ▼
+                            document.querySelectorAll('[id^="icon-"]').forEach(function(icon) {
+                                icon.textContent = '▼';
+                            });
+                        }
+
+                        // Ensure the subdirectory table section is visible
+                        var subdirTable = document.getElementById('subdirTable');
+                        var wasCollapsed = subdirTable && !subdirTable.classList.contains('show');
+                        if (wasCollapsed) subdirTable.classList.add('show');
+
+                        window.print();
+
+                        // Restore state after print dialog closes
+                        if (mode === 'expanded') {
+                            allChildRows.forEach(function(row, i) {
+                                row.style.display = previousDisplayStates[i];
+                            });
+                            // Restore icons based on actual row visibility
+                            document.querySelectorAll('[id^="icon-"]').forEach(function(icon) {
+                                var path = icon.id.replace('icon-', '');
+                                var firstChild = document.querySelector('.child-' + path.replace(/[\/\\.]/g, '\\$&'));
+                                icon.textContent = (firstChild && firstChild.style.display !== 'none') ? '▼' : '▶';
+                            });
+                        }
+                        if (wasCollapsed) subdirTable.classList.remove('show');
+                    }
 
                     // Toggle child directories
                     function toggleChildren(parentPath) {
