@@ -9,8 +9,6 @@ config_locations = [
     os.environ.get('VAST_QUOTA_CONFIG', ''),
     'config.ini',  # Current working directory
     os.path.join(os.path.dirname(__file__), 'config.ini'),  # Script directory
-    os.path.expanduser('~/.vast-quota.ini'),
-    '/etc/vast-quota.conf'
 ]
 
 config_file = None
@@ -20,7 +18,11 @@ for location in config_locations:
         break
 
 if config_file:
-    config.read(config_file)
+    files_read = config.read(config_file)
+    import sys
+    print(f"[CONFIG] Found config: {config_file}", file=sys.stderr, flush=True)
+    print(f"[CONFIG] Files read by configparser: {files_read}", file=sys.stderr, flush=True)
+    print(f"[CONFIG] Sections after read: {config.sections()}", file=sys.stderr, flush=True)
 else:
     # Default configuration for testing
     config['vast'] = {

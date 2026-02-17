@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
+        <div class="alert alert-success" role="alert">
+            <h4 class="alert-heading">Welcome, {{ current_user }}!</h4>
+            <p>You have successfully logged in.</p>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-5 text-center">
+                <h3 class="mb-4">Your Storage Dashboard</h3>
+                <p class="mb-4">
+                    Click below to view your current storage quota and usage information on the VAST system.
+                </p>
+                <a href="/dashboard?fetch=true" class="btn btn-primary btn-lg px-5">
+                    View My Quota
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

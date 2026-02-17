@@ -12,6 +12,16 @@ import logging
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
 
+# Set debug mode from config (works for both WSGI and standalone)
+import sys
+import os
+print(f"[STARTUP] CWD: {os.getcwd()}", file=sys.stderr, flush=True)
+print(f"[STARTUP] Config file: {config.config_file if hasattr(config, 'config_file') else 'None'}", file=sys.stderr, flush=True)
+print(f"[STARTUP] Flask section: {config.config.has_section('flask')}", file=sys.stderr, flush=True)
+print(f"[STARTUP] Debug raw value: '{config.config.get('flask', 'debug', fallback='NOTFOUND')}'", file=sys.stderr, flush=True)
+app.debug = config.getboolean('flask', 'debug', False)
+print(f"[STARTUP] DEBUG MODE: {app.debug}", file=sys.stderr, flush=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -20,35 +30,47 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @app.route('/')
+def landing():
+    """Public landing page - no authentication required."""
+    return render_template('landing.html')
+
+@app.route('/dashboard')
 def dashboard():
-    """Main dashboard showing user's quota or search results."""
+    """Authenticated dashboard - requires Shibboleth authentication via Apache."""
     current_user = get_current_user()
 
-    # Check if user is searching for someone else
+    # In production mode (debug=false), Apache/Shibboleth handles authentication
+    # If we reach here without current_user in production, something is wrong
+    if not app.debug and not current_user:
+        logger.error("No REMOTE_USER set after Shibboleth authentication")
+        abort(403, "Authentication failed - REMOTE_USER not set")
+
+    # In debug mode, allow access for testing
+    if app.debug and not current_user:
+        current_user = 'debug-user'
+        logger.warning("Debug mode: using debug-user")
+
+    # Check if user wants to fetch quota data
+    fetch_quota = request.args.get('fetch', '').lower() == 'true'
     search_user = request.args.get('user', '').strip()
 
-    # In debug mode with no search query and no authenticated user, show search prompt
-    if app.debug and not search_user and not current_user:
-        return render_template('search_prompt.html', debug_mode=True)
+    # In production mode, ignore search_user (only allow in debug mode)
+    if not app.debug and search_user:
+        logger.warning(f"User {current_user} attempted to search for another user in production mode")
+        search_user = ''
 
-    # In production mode (debug=false), require authentication
-    if not app.debug and not current_user:
-        # Redirect to Shibboleth login page
-        shibboleth_login = config.get('shibboleth', 'login_url', '/Shibboleth.sso/Login')
-        # Preserve the original URL to return to after login
-        return_url = request.url
-        login_url = f"{shibboleth_login}?target={return_url}"
-        logger.info(f"Redirecting to Shibboleth login: {login_url}")
-        return redirect(login_url)
+    # If not fetching quota, just show welcome page
+    if not fetch_quota and not search_user:
+        return render_template('welcome.html', current_user=current_user)
 
+    # Determine which user's quota to fetch
     if search_user:
-        # Searching for another user
+        # Only reachable in debug mode
         user = search_user
-        logger.info(f"User {current_user or 'anonymous'} searching for quota of: {user}")
+        logger.info(f"User {current_user} searching for quota of: {user}")
     else:
-        # Show current user's quota
         user = current_user
-        logger.info(f"Dashboard accessed by user: {user}")
+        logger.info(f"Fetching quota for user: {user}")
 
     # Get quota for user
     quota = get_quota_for_user(user)

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 text-center">
+        <h1 class="display-4 mb-4">VAST Quota Dashboard</h1>
+        <p class="lead mb-4">
+            Check your storage quota on the VAST storage system
+        </p>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-5">
+                <h3 class="mb-4">Get Started</h3>
+                <p class="mb-4">
+                    Log in with your Andrew ID to view your storage quota and usage information.
+                </p>
+                <a href="/dashboard" class="btn btn-primary btn-lg px-5">
+                    <i class="bi bi-box-arrow-in-right"></i> Login with Andrew ID
+                </a>
+            </div>
+        </div>
+
+        <div class="text-muted">
+            <p>
+                This dashboard provides real-time information about your storage usage,
+                including quota limits, used capacity, and inode counts.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

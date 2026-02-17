@@ -70,19 +70,20 @@ python3 test_capacity_breakdown.py --search-user YOUR_ANDREW_ID
 python3 app.py
 ```
 
-Then open: **http://localhost:5000**
+Then open: **http://localhost:5001**
+
+> **Note:** Using port 5001 because macOS Control Center uses port 5000
 
 ## Troubleshooting
 
-### Port 5000 Already in Use
+### Port Already in Use
 
-```bash
-# Find what's using port 5000
-lsof -i :5000
-
-# Kill it (replace PID with actual process ID)
-kill -9 <PID>
+Port 5001 should work fine. If it's also taken, edit `app.py` line 79:
+```python
+app.run(debug=True, host='0.0.0.0', port=5002)  # or any available port
 ```
+
+> **Note:** Port 5000 is used by macOS Control Center - don't kill it!
 
 ### SSH Connection Fails
 
@@ -135,6 +136,6 @@ The dashboard displays:
 
 ## Notes
 
-- Dashboard runs at `http://localhost:5000` by default
+- Dashboard runs at `http://localhost:5001` by default (5000 is used by macOS)
 - Debug mode is ON (shows detailed errors, auto-reloads on code changes)
 - Currently uses test authentication (check `modules/auth.py`)
