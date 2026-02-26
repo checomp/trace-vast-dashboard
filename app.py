@@ -45,11 +45,6 @@ def dashboard():
         logger.error("No REMOTE_USER set after Shibboleth authentication")
         abort(403, "Authentication failed - REMOTE_USER not set")
 
-    # In debug mode, allow access for testing
-    if app.debug and not current_user:
-        current_user = 'debug-user'
-        logger.warning("Debug mode: using debug-user")
-
     # Check if user wants to fetch quota data
     fetch_quota = request.args.get('fetch', '').lower() == 'true'
     search_user = request.args.get('user', '').strip()
@@ -59,8 +54,10 @@ def dashboard():
         logger.warning(f"User {current_user} attempted to search for another user in production mode")
         search_user = ''
 
-    # If not fetching quota, just show welcome page
+    # If not fetching quota, show appropriate page
     if not fetch_quota and not search_user:
+        if app.debug and not current_user:
+            return render_template('search_prompt.html')
         return render_template('welcome.html', current_user=current_user)
 
     # Determine which user's quota to fetch

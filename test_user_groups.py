@@ -25,7 +25,7 @@ def test_get_user_groups_success():
     print("TEST: get_user_groups() with valid user")
     print("=" * 60)
 
-    username = 'rwalsh'
+    username = 'bni2'
     print(f"Testing user: {username}")
 
     try:
@@ -45,6 +45,7 @@ def test_get_user_groups_success():
         print(f"\n  Username: {result['username']}")
         print(f"  Name: {result.get('name', 'N/A')}")
         print(f"  UID: {result.get('uid', 'N/A')}")
+        print(f"  SID: {result.get('sid', 'N/A')}")
         print(f"  Groups ({result['group_count']}): {', '.join(result['groups']) if result['groups'] else '(none)'}")
 
         return True

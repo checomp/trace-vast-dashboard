@@ -4,6 +4,8 @@
 
 {% block head %}
 <style>
+@page { margin: 0; }
+
 @media print {
     /* Hide navigation, buttons, debug panels, and footer */
     nav.navbar,
@@ -26,15 +28,20 @@
     .card { page-break-inside: avoid; }
     h5 { page-break-after: avoid; }
 
-    /* Clean look */
-    .badge { border: 1px solid #999; }
-    .progress { border: 1px solid #ccc; }
+    /* Force background colors and images to print */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Hide unnecessary first-page content */
+    .no-print { display: none !important; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row no-print">
     <div class="col-md-12">
         <h1 class="mt-4">Storage Quota Information</h1>
         {% if is_search %}
@@ -68,7 +75,7 @@
 </div>
 
 {% if debug_mode %}
-<div class="row mt-3">
+<div class="row mt-3 no-print">
     <div class="col-md-12">
         <div class="card bg-light">
             <div class="card-body">
@@ -94,21 +101,21 @@
                 <h4>{{ quota.name }}</h4>
             </div>
             <div class="card-body">
-                <h5>Basic Information</h5>
-                <table class="table table-sm">
-                    <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
-                    <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
-                    <tr><th>State:</th><td><span class="badge bg-success">{{ quota.state }}</span></td></tr>
-                    {% if quota.cluster %}
-                    <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
-                    {% endif %}
-                    {% if quota.tenant_name %}
-                    <tr><th>Tenant:</th><td>{{ quota.tenant_name }}</td></tr>
-                    {% endif %}
-                    {% if quota.grace_period %}
-                    <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
-                    {% endif %}
-                </table>
+                <div class="no-print">
+                    <h5>Basic Information</h5>
+                    <table class="table table-sm">
+                        <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
+                        <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
+                        <tr><th>State:</th><td><span class="badge bg-success">{{ quota.state }}</span></td></tr>
+                        {% if quota.cluster %}
+                        <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
+                        {% endif %}
+
+                        {% if quota.grace_period %}
+                        <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
+                        {% endif %}
+                    </table>
+                </div>
                 <h5 class="mt-4">Capacity Usage</h5>
                 <div class="progress usage-bar">
                     <div class="progress-bar
@@ -131,7 +138,7 @@
                 </h5>
                 <table class="table table-sm">
                     <tr>
-                        <th>Hard Limit:</th>
+                        <th>Quota:</th>
                         <td>{{ quota.hard_limit }}
                             {% if quota.hard_limit_bytes %}
                             <small class="text-muted">({{ "{:,}".format(quota.hard_limit_bytes) }} bytes)</small>
@@ -139,50 +146,12 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Soft Limit:</th>
-                        <td>{{ quota.soft_limit }}
-                            {% if quota.soft_limit_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.soft_limit_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="What counts against your quota limit (~logical data size)"
-                                  style="cursor: help;">
-                                Used (Quota Accounting):
-                            </span>
-                        </th>
-                        <td>{{ quota.used_effective }}
-                            {% if quota.used_effective_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.used_effective_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Original uncompressed data size (same as Logical Capacity below)"
-                                  style="cursor: help;">
-                                Used (Logical):
-                            </span>
-                        </th>
+                        <th>Used:</th>
                         <td>{{ quota.used_logical }}
                             {% if quota.used_logical_bytes %}
                             <small class="text-muted">({{ "{:,}".format(quota.used_logical_bytes) }} bytes)</small>
                             {% endif %}
                         </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Data reduction ratio: Logical / Physical disk space"
-                                  style="cursor: help;">
-                                Data Reduction Ratio (DRR):
-                            </span>
-                        </th>
-                        <td>{{ quota.drr }}:1</td>
                     </tr>
                 </table>
 
@@ -191,14 +160,6 @@
                     <tr>
                         <th>Used Inodes:</th>
                         <td>{{ quota.used_inodes }}</td>
-                    </tr>
-                    <tr>
-                        <th>Soft Limit:</th>
-                        <td>{{ quota.soft_limit_inodes }}</td>
-                    </tr>
-                    <tr>
-                        <th>Hard Limit:</th>
-                        <td>{{ quota.hard_limit_inodes }}</td>
                     </tr>
                     {% if quota.inode_usage_percentage %}
                     <tr>
@@ -244,26 +205,15 @@
                             <thead class="thead-dark">
                                 <tr>
                                     <th>Subdirectory Path</th>
+                                    <th class="text-right">Used</th>
                                     <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Physical disk space used"
-                                              style="cursor: help;">Physical (Disk)</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Original uncompressed data size (counts against quota)"
-                                              style="cursor: help;">Logical (Original)</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="This directory's physical disk usage as % of total physical disk usage"
-                                              style="cursor: help;">% of Physical</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Data reduction ratio for this directory"
-                                              style="cursor: help;">DRR</span>
+                                        <span data-bs-toggle="tooltip" data-bs-title="This directory's logical data size as % of the total quota limit"
+                                              style="cursor: help;">% of Quota</span>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
+                                {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='logical_bytes', reverse=True) %}
                                 {% if '/' not in subdir.path %}
                                 {# This is a top-level directory #}
                                 {% set has_children = namespace(value=false) %}
@@ -282,18 +232,19 @@
                                         {% endif %}
                                         <code>{{ subdir.path }}</code>
                                     </td>
-                                    <td class="text-right">{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
                                     <td class="text-right">
-                                        <span class="badge {% if subdir.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                            {{ "{:.1f}".format(subdir.percentage) }}%
+                                        {% if quota.hard_limit_bytes %}
+                                        {% set pct = subdir.logical_bytes / quota.hard_limit_bytes * 100 %}
+                                        <span class="badge bg-secondary">
+                                            {{ "{:.1f}".format(pct) }}%
                                         </span>
+                                        {% endif %}
                                     </td>
-                                    <td class="text-right">{{ "{:.2f}".format(subdir.drr) }}:1</td>
                                 </tr>
 
                                 {# Child rows (hidden by default) #}
-                                {% for child in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
+                                {% for child in quota.capacity_breakdown.subdirectories|sort(attribute='logical_bytes', reverse=True) %}
                                     {% if child.path.startswith(subdir.path + '/') %}
                                         {% set depth = child.path.count('/') %}
                                         {% if depth <= 2 %}
@@ -303,14 +254,15 @@
                                                 <span style="display: inline-block; width: 15px;"></span>
                                                 <code style="font-size: 0.9em;">{{ child.path }}</code>
                                             </td>
-                                            <td class="text-right">{{ "{:,.2f}".format(child.usable_bytes / (1024**3)) }} GB</td>
                                             <td class="text-right">{{ "{:,.2f}".format(child.logical_bytes / (1024**3)) }} GB</td>
                                             <td class="text-right">
-                                                <span class="badge {% if child.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                                    {{ "{:.1f}".format(child.percentage) }}%
+                                                {% if quota.hard_limit_bytes %}
+                                                {% set child_pct = child.logical_bytes / quota.hard_limit_bytes * 100 %}
+                                                <span class="badge bg-secondary">
+                                                    {{ "{:.1f}".format(child_pct) }}%
                                                 </span>
+                                                {% endif %}
                                             </td>
-                                            <td class="text-right">{{ "{:.2f}".format(child.drr) }}:1</td>
                                         </tr>
                                         {% endif %}
                                     {% endif %}
@@ -352,6 +304,12 @@
                         var allChildRows = document.querySelectorAll('tr[class^="child-"]');
                         var previousDisplayStates = [];
 
+                        // Set PDF filename via document title
+                        var originalTitle = document.title;
+                        var quotaPath = '{{ quota.path }}';
+                        var groupName = quotaPath.split('/').filter(Boolean).pop() || '{{ quota.name }}';
+                        document.title = groupName + '-vast-report';
+
                         if (mode === 'expanded') {
                             // Expand all child rows and update icons
                             allChildRows.forEach(function(row) {
@@ -384,6 +342,9 @@
                             });
                         }
                         if (wasCollapsed) subdirTable.classList.remove('show');
+
+                        // Restore original title
+                        document.title = originalTitle;
                     }
 
                     // Toggle child directories
