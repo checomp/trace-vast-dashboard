@@ -23,10 +23,20 @@ app.debug = config.getboolean('flask', 'debug', False)
 print(f"[STARTUP] DEBUG MODE: {app.debug}", file=sys.stderr, flush=True)
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Production (debug=false): stderr only — systemd captures it into journalctl
+# Debug (debug=true): stderr + optional file from config [logging] file =
+_debug = config.getboolean('flask', 'debug', False)
+log_level = logging.DEBUG if _debug else logging.INFO
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+handlers = [logging.StreamHandler()]
+
+if _debug:
+    import os
+    log_file = os.path.join(os.getcwd(), 'logs', 'app.log')
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    handlers.append(logging.FileHandler(log_file))
+
+logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
 logger = logging.getLogger(__name__)
 
 @app.route('/')
@@ -71,7 +81,11 @@ def dashboard():
 
     # Get quota for user
     quota = get_quota_for_user(user)
-    
+
+    if app.debug and quota:
+        import json
+        logger.debug(f"Raw VAST quota response for '{user}':\n{json.dumps(quota, indent=2, default=str)}")
+
     if not quota:
         error_msg = f"No quota found for user '{user}'."
         if search_user:
@@ -96,8 +110,13 @@ def dashboard():
     soft_limit_inodes = quota.get('soft_limit_inodes')
     hard_limit_inodes = quota.get('hard_limit_inodes')
 
-    # Calculate usage percentage
-    if hard_limit and used_effective:
+    # Calculate usage percentage.
+    # Use VAST's own percent_capacity first — it's what VAST enforces.
+    # Fall back to used_effective_capacity / hard_limit if not provided.
+    api_pct = quota.get('percent_capacity')
+    if api_pct is not None:
+        usage_pct = api_pct
+    elif hard_limit and used_effective:
         usage_pct = calculate_percentage(used_effective, hard_limit)
     else:
         usage_pct = 0

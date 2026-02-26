@@ -26,5 +26,7 @@ logout_url = /Shibboleth.sso/Logout
 ttl = 600
 
 [logging]
-level = INFO
-file = /opt/vast-quota-web/logs/app.log
+# Production (debug=false): logs go to stderr → journalctl automatically (no file needed)
+#   View with: journalctl -u apache2 -f   (or your httpd service name)
+# Debug (debug=true): logs go to stderr + the file below (directory created automatically)
+file = /tmp/vast-dashboard/app.log

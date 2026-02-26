@@ -38,6 +38,8 @@ config.ini
 # Test output
 vast_test_output.json
 *.log
+logs/
+quota_details_*.json
 
 # IDE
 .vscode/
