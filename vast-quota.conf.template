@@ -1,0 +1,71 @@
+Listen 443 https
+
+# VAST Quota Dashboard Apache Configuration
+
+<VirtualHost *:80>
+    ServerName {{SERVER_NAME}}
+    Redirect permanent / https://{{SERVER_NAME}}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName {{SERVER_NAME}}
+
+    # SSL Configuration
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/trace-vast-dashboard/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/trace-vast-dashboard/privkey.pem
+    
+    # WSGI Configuration
+    WSGIDaemonProcess vast-quota python-path=/opt/vast-quota-web:/usr/local/lib64/python3.9/site-packages:/usr/local/lib/python3.9/site-packages user=apache group=apache threads=5
+    WSGIScriptAlias / /opt/vast-quota-web/wsgi.py
+    WSGIPassAuthorization On
+    
+    <Directory /opt/vast-quota-web>
+        WSGIProcessGroup vast-quota
+        WSGIApplicationGroup %{GLOBAL}
+        Require all granted
+    </Directory>
+    
+    # Static files
+    Alias /static /opt/vast-quota-web/static
+    <Directory /opt/vast-quota-web/static>
+        Require all granted
+    </Directory>
+    
+    # ===== SHIBBOLETH CONFIGURATION =====
+    
+    # Shibboleth handler - MUST be enabled for Shibboleth login to work
+    <Location /Shibboleth.sso>
+        SetHandler shib
+    </Location>
+    
+    # Public routes - no authentication required
+    <Location />
+        Require all granted
+    </Location>
+    
+    <Location /health>
+        Require all granted
+    </Location>
+    
+    <Location /static>
+        Require all granted
+    </Location>
+    
+    # Protected routes - require Shibboleth authentication
+    <Location /dashboard>
+        AuthType shibboleth
+        ShibRequestSetting requireSession 1
+        Require valid-user
+    </Location>
+    
+    # Security headers
+    Header always set X-Frame-Options "DENY"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    
+    # Logging
+    ErrorLog /var/log/httpd/vast-quota-error.log
+    CustomLog /var/log/httpd/vast-quota-access.log combined
+</VirtualHost>
