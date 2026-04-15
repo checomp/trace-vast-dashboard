@@ -49,7 +49,7 @@ sudo systemctl restart httpd
 ### config.ini [apache] section
 
 - **`server_name`** - The fully qualified domain name (FQDN) for your server
-  - Example: `trace-vast-dashboard.cheme.local.cmu.edu`
+  - Example: `trace-vast-dashboard.wec.local.cmu.edu`
   - This value is used for:
     - HTTP to HTTPS redirect
     - SSL virtual host ServerName directive
@@ -112,4 +112,4 @@ echo "Apache configuration updated and service restarted"
 ## Default Values
 
 If the `server_name` is not set in `config.ini`, the script will use the default:
-- `trace-vast-dashboard.cheme.local.cmu.edu`
+- `trace-vast-dashboard.wec.local.cmu.edu`

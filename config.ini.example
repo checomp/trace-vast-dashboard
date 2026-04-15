@@ -4,10 +4,11 @@ password = your_vast_password
 address = 172.19.16.30
 timeout = 30
 
-[ssh]
-username = rwalsh
-host = trace.cmu.edu
-key_file = ~/.ssh/id_rsa
+[grouper]
+base_url = https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600
+username = trace-gro-svc
+stem = Apps:XRAS:trace_groups
+# Password is read from the GROUPER_PASSWORD environment variable (set in .env)
 
 [flask]
 # Web server settings
@@ -19,7 +20,7 @@ debug = true
 [apache]
 # Server hostname for Apache configuration
 # Used by scripts/generate_apache_config.py to generate the Apache config
-server_name = trace-vast-dashboard.cheme.local.cmu.edu
+server_name = trace-vast-dashboard.wec.local.cmu.edu
 
 [shibboleth]
 # Shibboleth authentication endpoints (used when debug=false)

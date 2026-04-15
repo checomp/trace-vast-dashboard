@@ -21,7 +21,7 @@ def generate_apache_config(template_path, output_path):
     """Generate Apache config from template using config.ini values."""
 
     # Read server_name from config.ini
-    server_name = config.get('apache', 'server_name', 'trace-vast-dashboard.cheme.local.cmu.edu')
+    server_name = config.get('apache', 'server_name', 'trace-vast-dashboard.wec.local.cmu.edu')
 
     # Read template
     try:
@@ -79,7 +79,7 @@ def main():
         )
 
     # Read config values
-    server_name = config.get('apache', 'server_name', 'trace-vast-dashboard.cheme.local.cmu.edu')
+    server_name = config.get('apache', 'server_name', 'trace-vast-dashboard.wec.local.cmu.edu')
 
     # Read template
     try:
