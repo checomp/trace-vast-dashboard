@@ -1,21 +1,122 @@
 """VAST API client wrapper"""
-from vastpy import VASTClient
+from modules.grouper_client import get_grouper_group
 import config
-import subprocess
+import json
 import os
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+from vastpy import VASTClient
+
+urllib3.disable_warnings(category=InsecureRequestWarning)
+proxy_url = config.get('vast','proxy','http://proxy.cmu.edu:3128')
+
+_original_request = VASTClient.request
+
+def _request_with_proxy(self, method, fields=None, data=None):
+    pm = urllib3.ProxyManager(proxy_url, cert_reqs='CERT_NONE')
+
+    # Prepare headers
+    if self._token:
+        headers = {'authorization': f"Api-Token {self._token}"}
+    else:
+        headers = urllib3.make_headers(basic_auth=f"{self._user}:{self._password}")
+
+    if self._tenant:
+        headers['X-Tenant-Name'] = self._tenant
+
+    # JSON body
+    if data:
+        headers['Content-Type'] = 'application/json'
+        data = json.dumps(data).encode('utf-8')
+
+    # fields only for GET requests
+    if fields and method.upper() == 'GET':
+        result = []
+        for k, v in fields.items():
+            if isinstance(v, list):
+                result.extend((k, i) for i in v)
+            else:
+                result.append((k, v))
+        fields = result
+    else:
+        fields = None  # POST/PUT should not use fields
+
+    version_path = f'/{self._version}' if self._version else ''
+    url = f'https://{self._address}/{self._url}{version_path}/'
+
+    r = pm.request(method, url, headers=headers, fields=fields, body=data)
+
+    if r.status not in [200, 201, 202, 204]:
+        raise Exception(f"VAST request failed: {method} {url} {r.status} {r.data}")
+
+    if 'application/json' in r.headers.get('Content-Type', '') and r.data:
+        return json.loads(r.data.decode('utf-8'))
+    return r.data
+
+VASTClient.request = _original_request  # Optional: keep original in case you want it
+VASTClient.request = _request_with_proxy
 
 _client = None
 
 def get_vast_client():
-    """Get or create VAST client instance."""
     global _client
     if _client is None:
+        password = os.environ.get('TRACE_API_PASSWORD')
+        if not password:
+            raise RuntimeError("TRACE_API_PASSWORD env var not set")
+
         _client = VASTClient(
             user=config.get('vast', 'username', 'admin'),
-            password=config.get('vast', 'password', '123456'),
-            address=config.get('vast', 'address', '10.143.11.203')
+            password=password,
+            address=config.get('vast', 'address', '10.143.11.203'),
         )
     return _client
+
+# Set your proxy URL
+#proxy_url = config.get('vast', 'proxy','http://proxy.cmu.edu:3128')
+#print(f"Using proxy: {proxy_url}")
+
+# Monkey-patch urllib3.PoolManager globally
+#_original_poolmanager_init = urllib3.PoolManager.__init__
+
+#def _poolmanager_proxy_init(self, *args, **kwargs):
+#    from urllib3 import ProxyManager
+#    self._proxy_manager = ProxyManager(proxy_url, cert_reqs='CERT_NONE')
+#    _original_poolmanager_init(self, *args, **kwargs)
+
+#urllib3.PoolManager.__init__ = _poolmanager_proxy_init
+
+# -----------------------------
+# Now import vastpy
+# -----------------------------
+#from vastpy import VASTClient
+
+# Your get_vast_client as before
+#_client = None
+#def get_vast_client():
+#    global _client
+#    if _client is None:
+#        password = os.environ.get('TRACE_API_PASSWORD')
+#        if not password:
+#            raise RuntimeError("TRACE_API_PASSWORD environment variable is not set")
+#
+#        _client = VASTClient(
+#            user=config.get('vast', 'username', 'admin'),
+#            password=password,
+#            address=config.get('vast','address', '10.143.11.203'),
+#        )
+#    return _client
+#def get_vast_client():
+#    """Get or create VAST client instance."""
+#    global _client
+#    if _client is None:
+#
+#        _client = VASTClient(
+#            user=config.get('vast', 'username', 'admin'),
+#            password=os.environ.get('TRACE_API_PASSWORD') or config.get('vast', 'password', '123456'),
+#            address=config.get('vast', 'address', '10.143.11.203')
+#        )
+#    return _client
 
 def get_user_groups(username, tenant_id=None):
     """
@@ -129,63 +230,6 @@ def get_user_quota(username):
         print(f"Error fetching quota for user '{username}': {e}")
         raise
 
-def get_unix_groups(search_username):
-    """
-    Get Unix groups for a user by SSHing to trace.cmu.edu and running 'groups' command.
-    Uses SSH username and key from config to connect, then queries groups for search_username.
-
-    Args:
-        search_username: The username to query groups for (e.g., 'jdoe')
-
-    Returns:
-        list: List of group names (excluding 'users'), or empty list on error
-    """
-    try:
-        # Get SSH credentials from config
-        ssh_user = config.get('ssh', 'username', 'rwalsh')
-        ssh_host = config.get('ssh', 'host', 'trace.cmu.edu')
-        ssh_key = config.get('ssh', 'key_file', '~/.ssh/id_rsa')
-        ssh_key = os.path.expanduser(ssh_key)  # Expand ~ to home directory
-        ssh_target = f"{ssh_user}@{ssh_host}"
-
-        # Build SSH command with key file
-        cmd = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10']
-
-        # Add key file if specified
-        if ssh_key and os.path.exists(ssh_key):
-            cmd.extend(['-i', ssh_key])
-
-        cmd.extend([ssh_target, 'groups', search_username])
-
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-
-        if result.returncode != 0:
-            print(f"SSH failed: {result.stderr}")
-            return []
-
-        # Parse output: "username : group1 group2 group3"
-        output = result.stdout.strip()
-
-        # Split on colon and get the groups part
-        if ':' in output:
-            groups_part = output.split(':', 1)[1].strip()
-        else:
-            groups_part = output
-
-        # Split groups and filter out 'users' and username itself
-        groups = groups_part.split()
-        filtered_groups = [g for g in groups if g != 'users' and g != search_username]
-
-        return filtered_groups
-
-    except subprocess.TimeoutExpired:
-        print(f"SSH timeout when querying groups for '{search_username}'")
-        return []
-    except Exception as e:
-        print(f"Error getting Unix groups for '{search_username}': {e}")
-        import traceback
-        traceback.print_exc()
-        return []
 
 def find_quota_by_group(group_name):
     """
@@ -198,9 +242,12 @@ def find_quota_by_group(group_name):
         dict: First matching quota, or None if not found
     """
     try:
+        print(f"Getting Client")
         client = get_vast_client()
 
+        print(f"client {client}")
         # Get all quotas
+        print(f"Getting quotas")
         quotas = client.quotas.get()
 
         # Search for quotas where the name contains the group name
@@ -347,10 +394,9 @@ def get_capacity_breakdown(quota_path):
 def get_quota_for_user(andrew_id):
     """
     Get quota information for a specific user by:
-    1. SSH to trace.cmu.edu (as SSH user from config) to get Unix groups for andrew_id
-    2. Find the primary group (not 'users')
-    3. Search VAST quotas for that group name
-    4. Return matching quota details with capacity breakdown
+    1. Query Grouper API for groups the user belongs to under the trace_groups stem
+    2. Find the first group that matches a VAST quota
+    3. Return matching quota details with capacity breakdown
 
     Args:
         andrew_id: The username/andrew_id to query
@@ -359,22 +405,21 @@ def get_quota_for_user(andrew_id):
         dict: Complete quota information including capacity breakdown, or None if not found
     """
     try:
-        # Step 1: Get Unix groups from trace.cmu.edu
-        print(f"Getting Unix groups for '{andrew_id}' from trace.cmu.edu...")
-        unix_groups = get_unix_groups(andrew_id)
+        # Step 1: Get group from Grouper
+        print(f"Getting Grouper groups for '{andrew_id}'...")
+        trace_group = get_grouper_group(andrew_id)
 
-        if not unix_groups:
-            print(f"No groups found for user '{andrew_id}'")
+        if not trace_group:
+            print(f"No Grouper groups found for user '{andrew_id}'")
             return None
 
-        print(f"Found groups: {unix_groups}")
 
-        # Step 2: Use the first group (primary group)
-        primary_group = unix_groups[0]
-        print(f"Using primary group: '{primary_group}'")
+        # Step 2: Use the group
+        print(f"Using group: '{trace_group}'")
 
         # Step 3: Find quota matching this group
-        quota = find_quota_by_group(primary_group)
+        quota = find_quota_by_group(trace_group)
+        print(f"found quota {quota}")
 
         if not quota:
             return None

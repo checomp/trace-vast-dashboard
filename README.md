@@ -1,43 +1,52 @@
 # VAST Quota Web Dashboard
 
-Web application for viewing VAST storage quota information with Shibboleth authentication and group-based access control.
+Web application for viewing VAST storage quota information with Shibboleth authentication and Grouper-based group lookup.
 
 ## Features
 
 - **Shibboleth Authentication**: Integrates with CMU's authentication system
-- **VAST API Integration**: Queries user groups and quota information from VAST storage
-- **Group-Based Access Control**: Supports role-based authorization using VAST groups
+- **Grouper Integration**: Looks up group membership under `Apps:XRAS:trace_groups` via the Grouper WS REST API
+- **VAST API Integration**: Queries quota information from VAST storage based on the user's Grouper group
 - **User Quota Display**: Shows storage usage and limits for authenticated users
 
 ## Project Structure
 
 ```
 vast-quota-web/
-├── app.py                  # Main Flask application
-├── config.ini              # Configuration file (not in git)
+├── app.py                      # Main Flask application
+├── config.ini                  # Configuration file (not in git)
+├── config.ini.example          # Configuration template
+├── .env                        # Secret environment variables (not in git)
+├── .env.example                # Environment variable template
 ├── modules/
-│   ├── auth.py            # Authentication and authorization
-│   ├── vast_client.py     # VAST API client wrapper
-│   └── config.py          # Configuration management
-├── templates/             # HTML templates
-├── static/                # Static assets (CSS, JS, images)
-├── test_vast_local.py     # Standalone VAST API test script
-└── test_user_groups.py    # Unit tests for user groups
+│   ├── auth.py                 # Shibboleth authentication and authorization
+│   ├── grouper_client.py       # Grouper WS REST API client
+│   └── vast_client.py          # VAST API client wrapper
+├── templates/                  # HTML templates
+├── static/                     # Static assets (CSS, JS, images)
+├── scripts/
+│   └── generate_apache_config.py  # Apache config generator
+├── docs/
+│   └── APACHE_CONFIG.md        # Apache configuration docs
+└── test_vast_local.py          # Standalone VAST API test script
+```
 
 ## Prerequisites
 
 - Python 3.8+
-- Network access to VAST cluster
+- Network access to VAST cluster (`wec-vast-01.wec.local.cmu.edu`)
+- Network access to Grouper (`grouper.andrew.cmu.edu`)
 - VAST API credentials
+- Grouper service account credentials (`trace-gro-svc`)
 
 ## Installation
 
-### On Remote Server (Production)
+### Production Server
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd vast-quota-web
+git clone git@github.com:checomp/trace-vast-dashboard.git
+cd trace-vast-dashboard
 ```
 
 2. Create virtual environment:
@@ -51,222 +60,119 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Create `config.ini`:
+4. Create `config.ini` from the example:
+```bash
+cp config.ini.example config.ini
+```
+
+Edit `config.ini` and fill in your VAST credentials:
 ```ini
 [vast]
 username = your_vast_username
 password = your_vast_password
-address = your.vast.cluster.address
+address = wec-vast-01.wec.local.cmu.edu
 ```
 
-5. Run the application:
+5. Create `.env` from the example and set the Grouper password:
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+```
+GROUPER_PASSWORD=your_grouper_service_account_password
+```
+
+6. Run the application:
 ```bash
 python app.py
 ```
 
-### On Local Mac (For Testing)
+### Local Mac (For Testing)
 
-1. Clone the repository:
+See [MAC_SETUP.md](MAC_SETUP.md) for a step-by-step local setup guide.
+
+## Configuration
+
+### config.ini sections
+
+| Section | Purpose |
+|---|---|
+| `[vast]` | VAST API credentials and cluster address |
+| `[grouper]` | Grouper WS REST base URL, service account username, and stem path |
+| `[apache]` | Server hostname used by the Apache config generator |
+| `[flask]` | Port, host, and debug mode |
+| `[shibboleth]` | Login/logout URL paths |
+| `[cache]` | Cache TTL in seconds |
+| `[logging]` | Log level and log file path |
+
+### Environment variables (`.env`)
+
+| Variable | Description |
+|---|---|
+| `GROUPER_PASSWORD` | Password for the `trace-gro-svc` Grouper service account |
+
+`.env` is loaded automatically at startup via `python-dotenv`. It must never be committed to git.
+
+### Authentication modes
+
+**Production** (`debug = false` in `config.ini`):
+- Requires Apache + Shibboleth
+- User identity comes from the `REMOTE_USER` environment variable set by `mod_shib`
+
+**Debug** (`debug = true` in `config.ini`):
+- No Shibboleth required
+- Enables the manual user search field on the dashboard
+
+## Grouper Integration
+
+Group membership is resolved at request time via the Grouper WS REST API:
+
+- **Endpoint**: `GET /subjects/{andrew_id}/groups`
+- **Base URL**: `https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600`
+- **Stem filter**: `Apps:XRAS:trace_groups`
+- **Auth**: HTTP Basic — username from `[grouper] username`, password from `GROUPER_PASSWORD` env var
+
+The leaf group name (e.g. `wec_faculty`) is then used to find the matching VAST quota by name.
+
+## Apache Configuration
+
+The Apache config is generated from a template using `config.ini`:
+
 ```bash
-git clone <repository-url>
-cd vast-quota-web
+# Preview (dry run)
+python3 scripts/generate_apache_config.py --dry-run
+
+# Generate and write
+sudo python3 scripts/generate_apache_config.py
+sudo systemctl restart httpd
 ```
 
-2. Create virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
-pip install vastpy flask
-```
-
-4. Test VAST connectivity:
-```bash
-python3 test_vast_local.py \
-  --login-user your_username \
-  --password 'your_password' \
-  --address 172.19.16.30 \
-  --search-user username_to_query
-```
-
-This will:
-- Authenticate to VAST API with `--login-user` credentials
-- Query information for `--search-user`
-- Display user groups and quota information
-- Save results to `vast_test_output.json`
-
-5. Run the Flask app locally:
-```bash
-# Set VAST credentials
-export VAST_USERNAME=your_username
-export VAST_PASSWORD=your_password
-export VAST_ADDRESS=172.19.16.30
-
-# Run app
-python app.py
-```
-
-The app will be available at `http://localhost:5000`
-
-**Note for Mac Users**: Ensure you have network connectivity to the VAST cluster. You may need to be on VPN or the campus network.
+See [docs/APACHE_CONFIG.md](docs/APACHE_CONFIG.md) for details.
 
 ## Testing
 
-### Test VAST API Functions
-
 ```bash
-# Test user groups functionality
-python3 test_user_groups.py
-
-# Test with specific user
-python3 test_user_groups.py --user username
-
-# Test VAST connectivity and quota
+# Test VAST API connectivity and quota lookup
 python3 test_vast_local.py \
   --login-user admin_user \
   --password 'admin_password' \
-  --address 172.19.16.30 \
-  --search-user test_user
-```
+  --address wec-vast-01.wec.local.cmu.edu \
+  --search-user test_andrew_id
 
-### Test Flask App
-
-```bash
 # Run Flask in development mode
 FLASK_ENV=development python app.py
 ```
 
-## Configuration
-
-### VAST Connection
-
-Edit `config.ini`:
-
-```ini
-[vast]
-username = vast_api_username
-password = vast_api_password
-address = vast.cluster.address
-```
-
-### Authentication Mode
-
-The application supports two modes:
-
-**Production Mode** (Shibboleth):
-- Requires Apache/Shibboleth configuration
-- Extracts user from `REMOTE_USER` environment variable
-
-**Testing Mode** (in `modules/auth.py`):
-```python
-# ===== TESTING MODE =====
-if not eppn:
-    return 'rwalsh'  # Test user
-# ===== END TESTING MODE =====
-```
-
-To disable testing mode, comment out or remove this block.
-
-## API Functions
-
-### `get_user_groups(username)`
-
-Query user information from VAST API.
-
-```python
-from modules.vast_client import get_user_groups
-
-user_info = get_user_groups('rwalsh')
-# Returns:
-# {
-#     'username': 'rwalsh',
-#     'groups': ['users', 'developers'],
-#     'gids': [1000, 2000],
-#     'quota_ids': [123, 456],
-#     ...
-# }
-```
-
-### `get_user_quota(username)`
-
-Get quota information for a user. Returns the full quota object from VAST API.
-
-```python
-from modules.vast_client import get_user_quota
-
-quota = get_user_quota('rwalsh')
-# Returns full quota object with all fields from VAST API
-```
-
-### Group-Based Authorization
-
-```python
-from modules.auth import require_group, user_in_group
-
-# Decorator for route protection
-@app.route('/admin')
-@require_group('admins')
-def admin_page():
-    return "Admin content"
-
-# Check membership programmatically
-if user_in_group('developers'):
-    # User is in developers group
-    pass
-```
-
-## Development
-
-### Adding New Features
-
-1. Create feature branch:
-```bash
-git checkout -b feature/your-feature
-```
-
-2. Make changes and test:
-```bash
-python3 test_user_groups.py
-python3 test_vast_local.py --login-user admin --password pwd --address 172.19.16.30 --search-user testuser
-```
-
-3. Commit changes:
-```bash
-git add .
-git commit -m "Add your feature"
-```
-
-4. Push and create PR:
-```bash
-git push origin feature/your-feature
-```
-
 ## Troubleshooting
 
-### VAST Connection Issues
-
-1. **Connection timeout**: Verify network connectivity to VAST cluster
-2. **Authentication failed**: Check username/password in config.ini
-3. **User not found**: Ensure username exists in VAST system
-
-### Testing from Mac
-
-1. **Network connectivity**: Ensure you're on CMU network or VPN
-2. **Python version**: Use Python 3.8 or higher
-3. **Dependencies**: Install vastpy: `pip install vastpy`
-
-### Flask App Issues
-
-1. **Config file not found**: Create `config.ini` in project root
-2. **Module import errors**: Ensure you're in virtual environment
-3. **VAST API errors**: Check credentials and network connectivity
-
-## License
-
-[Add your license here]
+| Problem | Check |
+|---|---|
+| `GROUPER_PASSWORD environment variable is not set` | Ensure `.env` exists and contains `GROUPER_PASSWORD=...` |
+| Grouper returns empty groups | Verify the user exists in `Apps:XRAS:trace_groups` and the service account has read access |
+| VAST connection timeout | Verify network access to `wec-vast-01.wec.local.cmu.edu` (may need VPN) |
+| No quota found for group | Confirm the Grouper leaf group name matches a quota name in VAST |
+| 403 on dashboard | Check Shibboleth is running and `REMOTE_USER` is being set by Apache |
 
 ## Contributors
 

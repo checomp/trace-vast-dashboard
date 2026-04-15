@@ -12,17 +12,11 @@ pip3 --version
 
 ## Setup Steps
 
-### 1. Copy Project to Mac
+### 1. Clone the Repository
 
 ```bash
-# Option A: Clone from GitHub
 git clone git@github.com:checomp/trace-vast-dashboard.git
 cd trace-vast-dashboard
-
-# Option B: Copy from server
-rsync -avz --exclude 'logs/' --exclude '__pycache__/' --exclude 'venv/' \
-  user@server:/opt/vast-quota-web/ ~/vast-quota-web/
-cd ~/vast-quota-web
 ```
 
 ### 2. Create Virtual Environment
@@ -35,34 +29,49 @@ source venv/bin/activate
 ### 3. Install Dependencies
 
 ```bash
-pip install flask vastpy
+pip install -r requirements.txt
 ```
 
 ### 4. Configure Settings
+
+Copy the example config and fill in your VAST credentials:
+
+```bash
+cp config.ini.example config.ini
+```
 
 Edit `config.ini`:
 
 ```ini
 [vast]
 username = admin
-password = YOUR_PASSWORD
-address = 10.143.11.203
+password = YOUR_VAST_PASSWORD
+address = wec-vast-01.wec.local.cmu.edu
 
-[ssh]
-username = YOUR_ANDREW_ID
-host = trace.cmu.edu
-key_file = ~/.ssh/id_rsa
+[grouper]
+base_url = https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600
+username = trace-gro-svc
+stem = Apps:XRAS:trace_groups
+
+[flask]
+debug = true
+port = 5001
+host = 0.0.0.0
 ```
 
-### 5. Test Connection
+### 5. Set the Grouper Password
 
 ```bash
-# Test SSH to trace.cmu.edu
-ssh YOUR_ANDREW_ID@trace.cmu.edu "groups YOUR_ANDREW_ID"
-
-# Test VAST connection
-python3 test_capacity_breakdown.py --search-user YOUR_ANDREW_ID
+cp .env.example .env
 ```
+
+Edit `.env` and add the `trace-gro-svc` service account password:
+
+```
+GROUPER_PASSWORD=your_grouper_password_here
+```
+
+This file is gitignored and loaded automatically at startup.
 
 ### 6. Run the App
 
@@ -72,50 +81,21 @@ python3 app.py
 
 Then open: **http://localhost:5001**
 
-> **Note:** Using port 5001 because macOS Control Center uses port 5000
-
-## Troubleshooting
-
-### Port Already in Use
-
-Port 5001 should work fine. If it's also taken, edit `app.py` line 79:
-```python
-app.run(debug=True, host='0.0.0.0', port=5002)  # or any available port
-```
-
-> **Note:** Port 5000 is used by macOS Control Center - don't kill it!
-
-### SSH Connection Fails
-
-- Make sure you can SSH manually: `ssh YOUR_ANDREW_ID@trace.cmu.edu`
-- Check if you need CMU VPN
-- Verify SSH key exists: `ls -la ~/.ssh/id_rsa`
-
-### VAST Connection Fails
-
-- Check if you can ping: `ping 10.143.11.203`
-- Verify credentials in `config.ini`
-- May need VPN to access VAST cluster
-
-### Testing with Different Users
-
-Edit `modules/auth.py` to change the test user:
-
-```python
-def get_current_user():
-    # For testing, return specific username
-    return "test_user"
-```
+> **Note:** Port 5001 is used because macOS Control Center occupies port 5000.
 
 ## Quick Command Reference
 
 ```bash
-# Start app
+# Activate venv and start app
 source venv/bin/activate
 python3 app.py
 
-# Test user lookup
-python3 test_capacity_breakdown.py --search-user USERNAME
+# Test VAST quota lookup for a specific user
+python3 test_vast_local.py \
+  --login-user admin \
+  --password 'YOUR_VAST_PASSWORD' \
+  --address wec-vast-01.wec.local.cmu.edu \
+  --search-user ANDREW_ID
 
 # Stop app
 Ctrl+C
@@ -124,18 +104,45 @@ Ctrl+C
 deactivate
 ```
 
+## Troubleshooting
+
+### GROUPER_PASSWORD not set
+
+Make sure `.env` exists in the project root and contains:
+```
+GROUPER_PASSWORD=your_password
+```
+
+### VAST Connection Fails
+
+- Verify you're on the CMU network or VPN
+- Check credentials in `config.ini`
+- Try pinging the cluster: `ping wec-vast-01.wec.local.cmu.edu`
+
+### Grouper Returns No Groups
+
+- Confirm the Andrew ID exists under `Apps:XRAS:trace_groups` in Grouper
+- Verify network access to `grouper.andrew.cmu.edu`
+- Check that `GROUPER_PASSWORD` is correct for `trace-gro-svc`
+
+### Port Already in Use
+
+Edit `config.ini` and change the port:
+```ini
+[flask]
+port = 5002
+```
+
+### Testing with a Specific User
+
+In debug mode (`debug = true`), the dashboard shows a user search field — enter any Andrew ID to look up their quota.
+
 ## What You'll See
 
 The dashboard displays:
 
-✅ **Basic Info**: Path, GUID, State, Cluster, Tenant
-✅ **Capacity**: Hard/Soft limits, Used (effective & logical), DRR
-✅ **Inodes**: File count limits and usage
-✅ **Usage Bar**: Visual progress with color coding
-✅ **Capacity Breakdown**: Root stats + expandable subdirectory table (sorted by usage)
-
-## Notes
-
-- Dashboard runs at `http://localhost:5001` by default (5000 is used by macOS)
-- Debug mode is ON (shows detailed errors, auto-reloads on code changes)
-- Currently uses test authentication (check `modules/auth.py`)
+- **Basic Info**: Path, GUID, State, Cluster, Tenant
+- **Capacity**: Hard/Soft limits, Used (effective & logical), DRR
+- **Inodes**: File count limits and usage
+- **Usage Bar**: Visual progress with colour coding
+- **Capacity Breakdown**: Root stats + expandable subdirectory table (sorted by usage)

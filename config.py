@@ -1,6 +1,10 @@
 """Configuration loader for VAST Quota Dashboard"""
 import configparser
 import os
+from dotenv import load_dotenv
+
+# Load .env from project root (silently ignored if file does not exist)
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 config = configparser.ConfigParser()
 
@@ -31,10 +35,10 @@ else:
         'password': '123456',
         'timeout': '30'
     }
-    config['ssh'] = {
-        'username': 'rwalsh',
-        'host': 'trace.cmu.edu',
-        'key_file': '~/.ssh/id_rsa'
+    config['grouper'] = {
+        'base_url': 'https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600',
+        'username': 'trace-gro-svc',
+        'stem': 'Apps:XRAS:trace_groups'
     }
     config['flask'] = {
         'port': '5001',
