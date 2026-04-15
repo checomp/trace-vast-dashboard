@@ -32,13 +32,18 @@ instance/
 
 # Config files with sensitive data
 config.ini
+*.bak
 *.secret
 *.key
 
-# Test output
+# Test output / exports
 vast_test_output.json
 *.log
 logs/
+quota_details_*.json
+vast_quotas_*.csv
+vast_user_quotas_*.csv
+vast_group_quotas_*.csv
 
 # IDE
 .vscode/

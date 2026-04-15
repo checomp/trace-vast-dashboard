@@ -1,14 +1,14 @@
 """Data formatting utilities"""
 
 def format_bytes(bytes_value):
-    """Convert bytes to human-readable format."""
+    """Convert bytes to human-readable format using decimal (base-10) prefixes."""
     if bytes_value is None:
         return "N/A"
-    
+
     for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
-        if bytes_value < 1024.0:
+        if bytes_value < 1000.0:
             return f"{bytes_value:.2f} {unit}"
-        bytes_value /= 1024.0
+        bytes_value /= 1000.0
     return f"{bytes_value:.2f} PB"
 
 def calculate_percentage(used, total):

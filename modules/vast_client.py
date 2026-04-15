@@ -254,35 +254,35 @@ def get_capacity_breakdown(quota_path):
         if not capacity:
             return None
 
+        import logging as _log
+        _logger = _log.getLogger(__name__)
+        import json as _json
+        _logger.debug(f"Capacity API full response:\n{_json.dumps(capacity, indent=2, default=str)}")
+
         result = {
             'root': None,
             'subdirectories': []
         }
 
-        # Try to find exact path match in details first (more accurate)
-        path_data = None
-        if 'details' in capacity and capacity['details']:
-            for entry in capacity['details']:
-                if isinstance(entry, list) and len(entry) >= 2:
-                    if entry[0] == quota_path:
-                        path_data = entry[1].get('data') if isinstance(entry[1], dict) else None
-                        break
+        # Normalise quota_path — strip trailing slash for consistent matching
+        quota_path = quota_path.rstrip('/')
 
-        # If we found path-specific data, use it; otherwise fall back to root_data
-        if path_data and len(path_data) >= 3:
-            usable_bytes = path_data[0]
-            unique_bytes = path_data[1]
-            logical_bytes = path_data[2]
-        elif 'root_data' in capacity and capacity['root_data']:
-            root_data = capacity['root_data']
-            if len(root_data) >= 3:
-                usable_bytes = root_data[0]
-                unique_bytes = root_data[1]
-                logical_bytes = root_data[2]
-            else:
-                return None
-        else:
+        # Find the root entry by exact path match across both details and small_folders.
+        # root_data is the VAST system total, not the queried path's data — do not use it.
+        all_entries = list(capacity.get('details') or []) + list(capacity.get('small_folders') or [])
+        root_data = None
+        for entry in all_entries:
+            if isinstance(entry, list) and len(entry) >= 2:
+                if entry[0].rstrip('/') == quota_path:
+                    root_data = entry[1].get('data') if isinstance(entry[1], dict) else None
+                    break
+
+        if not root_data or len(root_data) < 3:
             return None
+
+        usable_bytes = root_data[0]
+        unique_bytes = root_data[1]
+        logical_bytes = root_data[2]
 
         # Calculate DRR for root
         drr = logical_bytes / usable_bytes if usable_bytes > 0 else 0
@@ -295,47 +295,46 @@ def get_capacity_breakdown(quota_path):
             'drr': drr
         }
 
-        # Process subdirectories
-        if 'details' in capacity and capacity['details']:
-            for entry in capacity['details']:
-                if isinstance(entry, list) and len(entry) >= 2:
-                    path = entry[0]
-                    entry_data = entry[1]
+        # Process subdirectories from both 'details' (large dirs) and 'small_folders'
+        # — VAST splits entries between these two arrays based on size threshold.
+        all_entries = list(capacity.get('details') or []) + list(capacity.get('small_folders') or [])
+        for entry in all_entries:
+            if not (isinstance(entry, list) and len(entry) >= 2):
+                continue
+            path = entry[0].rstrip('/')
+            entry_data = entry[1]
 
-                    # Skip the root path itself
-                    if path == quota_path:
-                        continue
+            # Skip the root path itself
+            if path == quota_path:
+                continue
 
-                    if isinstance(entry_data, dict) and 'data' in entry_data:
-                        data = entry_data['data']
-                        if len(data) >= 3:
-                            sub_usable = data[0]
-                            sub_unique = data[1]
-                            sub_logical = data[2]
+            if not isinstance(entry_data, dict) or 'data' not in entry_data:
+                continue
 
-                            # Calculate relative path
-                            if path.startswith(quota_path):
-                                rel_path = path[len(quota_path):].lstrip('/') or '.'
-                            else:
-                                rel_path = path
+            data = entry_data['data']
+            if len(data) < 3:
+                continue
 
-                            # Calculate DRR
-                            sub_drr = sub_logical / sub_usable if sub_usable > 0 else 0
+            sub_usable = data[0]
+            sub_unique = data[1]
+            sub_logical = data[2]
 
-                            # Calculate percentage of quota
-                            percentage = (sub_usable / usable_bytes * 100) if usable_bytes > 0 else 0
+            # Calculate relative path
+            rel_path = path[len(quota_path):].lstrip('/') if path.startswith(quota_path) else path
 
-                            result['subdirectories'].append({
-                                'path': rel_path,
-                                'usable_bytes': sub_usable,
-                                'unique_bytes': sub_unique,
-                                'logical_bytes': sub_logical,
-                                'drr': sub_drr,
-                                'percentage': percentage
-                            })
+            sub_drr = sub_logical / sub_usable if sub_usable > 0 else 0
+            percentage = (sub_usable / usable_bytes * 100) if usable_bytes > 0 else 0
 
-            # Sort subdirectories by path
-            result['subdirectories'].sort(key=lambda x: x['path'])
+            result['subdirectories'].append({
+                'path': rel_path,
+                'usable_bytes': sub_usable,
+                'unique_bytes': sub_unique,
+                'logical_bytes': sub_logical,
+                'drr': sub_drr,
+                'percentage': percentage
+            })
+
+        result['subdirectories'].sort(key=lambda x: x['path'])
 
         return result
 

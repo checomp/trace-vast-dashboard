@@ -6,8 +6,8 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-8">
         <div class="alert alert-success" role="alert">
-            <h4 class="alert-heading">Welcome, {{ current_user }}!</h4>
-            <p>You have successfully logged in.</p>
+            <h4 class="alert-heading">{% if current_user %}Welcome, {{ current_user }}!{% else %}Welcome!{% endif %}</h4>
+            <p>{% if current_user %}You have successfully logged in.{% else %}Use the search below to look up a user's quota.{% endif %}</p>
         </div>
 
         <div class="card shadow-sm mb-4">

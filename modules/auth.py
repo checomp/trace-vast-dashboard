@@ -29,7 +29,7 @@ def get_current_user_groups():
         dict: User information including groups, or None if not found
         Example:
         {
-            'username': 'rwalsh',
+            'username': 'AndrewID',
             'groups': ['users', 'developers'],
             'group_count': 2,
             ...

@@ -4,6 +4,8 @@
 
 {% block head %}
 <style>
+@page { margin: 0; }
+
 @media print {
     /* Hide navigation, buttons, debug panels, and footer */
     nav.navbar,
@@ -26,15 +28,20 @@
     .card { page-break-inside: avoid; }
     h5 { page-break-after: avoid; }
 
-    /* Clean look */
-    .badge { border: 1px solid #999; }
-    .progress { border: 1px solid #ccc; }
+    /* Force background colors and images to print */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Hide unnecessary first-page content */
+    .no-print { display: none !important; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row no-print">
     <div class="col-md-12">
         <h1 class="mt-4">Storage Quota Information</h1>
         {% if is_search %}
@@ -68,7 +75,7 @@
 </div>
 
 {% if debug_mode %}
-<div class="row mt-3">
+<div class="row mt-3 no-print">
     <div class="col-md-12">
         <div class="card bg-light">
             <div class="card-body">
@@ -94,121 +101,68 @@
                 <h4>{{ quota.name }}</h4>
             </div>
             <div class="card-body">
-                <h5>Basic Information</h5>
-                <table class="table table-sm">
-                    <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
-                    <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
-                    <tr><th>State:</th><td><span class="badge bg-success">{{ quota.state }}</span></td></tr>
-                    {% if quota.cluster %}
-                    <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
-                    {% endif %}
-                    {% if quota.tenant_name %}
-                    <tr><th>Tenant:</th><td>{{ quota.tenant_name }}</td></tr>
-                    {% endif %}
-                    {% if quota.grace_period %}
-                    <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
-                    {% endif %}
-                </table>
-                <h5 class="mt-4">Capacity Usage</h5>
-                <div class="progress usage-bar">
-                    <div class="progress-bar
-                        {% if quota.usage_percentage|float < 75 %}bg-success
-                        {% elif quota.usage_percentage|float < 90 %}bg-warning
-                        {% else %}bg-danger{% endif %}"
-                        role="progressbar"
-                        style="width: {{ quota.usage_percentage }}%"
-                        aria-valuenow="{{ quota.usage_percentage }}"
-                        aria-valuemin="0"
-                        aria-valuemax="100">
-                        {{ quota.usage_percentage }}%
+                <div class="no-print">
+                    <h5>Basic Information</h5>
+                    <table class="table table-sm">
+                        <tr><th>Path:</th><td><code>{{ quota.path }}</code></td></tr>
+                        <tr><th>GUID:</th><td><code>{{ quota.guid }}</code></td></tr>
+                        <tr><th>State:</th><td><span class="badge bg-success">{{ quota.state }}</span></td></tr>
+                        {% if quota.cluster %}
+                        <tr><th>Cluster:</th><td>{{ quota.cluster }}</td></tr>
+                        {% endif %}
+                        {% if quota.grace_period %}
+                        <tr><th>Grace Period:</th><td>{{ quota.grace_period }} seconds</td></tr>
+                        {% endif %}
+                    </table>
+                </div>
+                <div class="row align-items-center g-4 mt-2">
+                    {# Left: hero percentage #}
+                    <div class="col-md-3 text-center">
+                        <div class="display-4 fw-bold
+                            {% if quota.usage_percentage|float < 75 %}text-success
+                            {% elif quota.usage_percentage|float < 90 %}text-warning
+                            {% else %}text-danger{% endif %}">
+                            {{ quota.usage_percentage }}%
+                        </div>
+                        <div class="text-muted small">capacity used</div>
+                    </div>
+
+                    {# Right: used/quota + bar + secondary stats #}
+                    <div class="col-md-9">
+                        <div class="d-flex align-items-baseline gap-1 mb-1">
+                            <span class="fs-3 fw-semibold">{{ quota.used_logical }} / {{ quota.hard_limit }}</span>
+                            <span class="text-muted">used</span>
+                        </div>
+                        <div class="progress mb-1" role="progressbar"
+                             style="height: 14px;"
+                             aria-label="Storage usage"
+                             aria-valuenow="{{ quota.usage_percentage }}"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            <div class="progress-bar
+                                {% if quota.usage_percentage|float < 75 %}bg-success
+                                {% elif quota.usage_percentage|float < 90 %}bg-warning
+                                {% else %}bg-danger{% endif %}"
+                                style="width: {{ [quota.usage_percentage|float, 100]|min }}%">
+                            </div>
+                        </div>
+                        {% if quota.remaining %}
+                        <div class="text-muted small mb-3">{{ quota.remaining }} remaining</div>
+                        {% endif %}
+                        <div class="d-flex gap-4 mt-2">
+                            <div>
+                                <div class="text-muted small text-uppercase" style="letter-spacing: 0.05em;">Files</div>
+                                <div class="fs-5 fw-semibold">{{ quota.used_inodes }}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <h5 class="mt-4">
-                    Quota Accounting
-                    <span data-bs-toggle="tooltip" data-bs-placement="right"
-                          data-bs-title="What counts against your quota limit"
-                          style="cursor: help;">ℹ️</span>
-                </h5>
-                <table class="table table-sm">
-                    <tr>
-                        <th>Hard Limit:</th>
-                        <td>{{ quota.hard_limit }}
-                            {% if quota.hard_limit_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.hard_limit_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Soft Limit:</th>
-                        <td>{{ quota.soft_limit }}
-                            {% if quota.soft_limit_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.soft_limit_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="What counts against your quota limit (~logical data size)"
-                                  style="cursor: help;">
-                                Used (Quota Accounting):
-                            </span>
-                        </th>
-                        <td>{{ quota.used_effective }}
-                            {% if quota.used_effective_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.used_effective_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Original uncompressed data size (same as Logical Capacity below)"
-                                  style="cursor: help;">
-                                Used (Logical):
-                            </span>
-                        </th>
-                        <td>{{ quota.used_logical }}
-                            {% if quota.used_logical_bytes %}
-                            <small class="text-muted">({{ "{:,}".format(quota.used_logical_bytes) }} bytes)</small>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            <span data-bs-toggle="tooltip" data-bs-placement="right"
-                                  data-bs-title="Data reduction ratio: Logical / Physical disk space"
-                                  style="cursor: help;">
-                                Data Reduction Ratio (DRR):
-                            </span>
-                        </th>
-                        <td>{{ quota.drr }}:1</td>
-                    </tr>
-                </table>
 
-                <h5 class="mt-4">Inode Information (File Count)</h5>
-                <table class="table table-sm">
-                    <tr>
-                        <th>Used Inodes:</th>
-                        <td>{{ quota.used_inodes }}</td>
-                    </tr>
-                    <tr>
-                        <th>Soft Limit:</th>
-                        <td>{{ quota.soft_limit_inodes }}</td>
-                    </tr>
-                    <tr>
-                        <th>Hard Limit:</th>
-                        <td>{{ quota.hard_limit_inodes }}</td>
-                    </tr>
-                    {% if quota.inode_usage_percentage %}
-                    <tr>
-                        <th>Usage:</th>
-                        <td>{{ quota.inode_usage_percentage }}%</td>
-                    </tr>
-                    {% endif %}
-                </table>
-
-                {% if quota.usage_percentage|float >= 90 %}
+                {% if quota.usage_percentage|float > 100 %}
+                <div class="alert alert-danger mt-3" role="alert">
+                    <strong>Over Quota:</strong> Usage is at {{ quota.usage_percentage }}% — you have exceeded your quota limit. New writes may be blocked.
+                </div>
+                {% elif quota.usage_percentage|float >= 90 %}
                 <div class="alert alert-danger mt-3" role="alert">
                     <strong>Warning:</strong> Your quota usage is above 90%. Please clean up or request more space.
                 </div>
@@ -229,7 +183,7 @@
                 {% if quota.capacity_breakdown.subdirectories %}
                 {% set top_level_count = namespace(value=0) %}
                 {% for subdir in quota.capacity_breakdown.subdirectories %}
-                    {% if '/' not in subdir.path %}
+                    {% if '/' not in subdir.path and subdir.logical_bytes > 0 %}
                         {% set top_level_count.value = top_level_count.value + 1 %}
                     {% endif %}
                 {% endfor %}
@@ -239,87 +193,66 @@
                     </button>
                 </div>
                 <div class="collapse show" id="subdirTable">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th>Subdirectory Path</th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Physical disk space used"
-                                              style="cursor: help;">Physical (Disk)</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Original uncompressed data size (counts against quota)"
-                                              style="cursor: help;">Logical (Original)</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="This directory's physical disk usage as % of total physical disk usage"
-                                              style="cursor: help;">% of Physical</span>
-                                    </th>
-                                    <th class="text-right">
-                                        <span data-bs-toggle="tooltip" data-bs-title="Data reduction ratio for this directory"
-                                              style="cursor: help;">DRR</span>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
-                                {% if '/' not in subdir.path %}
-                                {# This is a top-level directory #}
-                                {% set has_children = namespace(value=false) %}
-                                {% for child in quota.capacity_breakdown.subdirectories %}
-                                    {% if child.path.startswith(subdir.path + '/') and child.path.count('/') <= 2 %}
-                                        {% set has_children.value = true %}
-                                    {% endif %}
-                                {% endfor %}
-                                <tr style="cursor: {% if has_children.value %}pointer{% else %}default{% endif %};"
-                                    {% if has_children.value %}onclick="toggleChildren('{{ subdir.path }}')"{% endif %}>
-                                    <td>
-                                        {% if has_children.value %}
-                                        <span id="icon-{{ subdir.path }}" style="display: inline-block; width: 15px;">▶</span>
-                                        {% else %}
-                                        <span style="display: inline-block; width: 15px;"></span>
-                                        {% endif %}
-                                        <code>{{ subdir.path }}</code>
-                                    </td>
-                                    <td class="text-right">{{ "{:,.2f}".format(subdir.usable_bytes / (1024**3)) }} GB</td>
-                                    <td class="text-right">{{ "{:,.2f}".format(subdir.logical_bytes / (1024**3)) }} GB</td>
-                                    <td class="text-right">
-                                        <span class="badge {% if subdir.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                            {{ "{:.1f}".format(subdir.percentage) }}%
-                                        </span>
-                                    </td>
-                                    <td class="text-right">{{ "{:.2f}".format(subdir.drr) }}:1</td>
-                                </tr>
-
-                                {# Child rows (hidden by default) #}
-                                {% for child in quota.capacity_breakdown.subdirectories|sort(attribute='percentage', reverse=True) %}
-                                    {% if child.path.startswith(subdir.path + '/') %}
-                                        {% set depth = child.path.count('/') %}
-                                        {% if depth <= 2 %}
-                                        <tr class="child-{{ subdir.path }}" style="display: none; background-color: #f8f9fa;">
-                                            <td>
-                                                <span style="display: inline-block; width: {{ depth * 20 }}px;"></span>
-                                                <span style="display: inline-block; width: 15px;"></span>
-                                                <code style="font-size: 0.9em;">{{ child.path }}</code>
-                                            </td>
-                                            <td class="text-right">{{ "{:,.2f}".format(child.usable_bytes / (1024**3)) }} GB</td>
-                                            <td class="text-right">{{ "{:,.2f}".format(child.logical_bytes / (1024**3)) }} GB</td>
-                                            <td class="text-right">
-                                                <span class="badge {% if child.percentage > 25 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                                    {{ "{:.1f}".format(child.percentage) }}%
-                                                </span>
-                                            </td>
-                                            <td class="text-right">{{ "{:.2f}".format(child.drr) }}:1</td>
-                                        </tr>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    {# Header row #}
+                    <div style="display: flex; align-items: center; padding: 0.25rem 0.25rem; border-bottom: 2px solid #dee2e6; font-weight: 600; color: #6c757d; font-size: 0.875em;">
+                        <span style="flex: 1;">Subdirectory Path</span>
+                        <span style="width: 7rem; text-align: right; flex-shrink: 0;">Used (GB)</span>
+                        <span style="width: 5rem; text-align: right; flex-shrink: 0; margin-left: 1.5rem; padding-left: 1.5rem; border-left: 1px solid #dee2e6;">
+                            <span data-bs-toggle="tooltip" data-bs-title="This directory's logical data size as % of the total quota limit" style="cursor: help;">% of Quota</span>
+                        </span>
                     </div>
+                    {# Data rows #}
+                    {% for subdir in quota.capacity_breakdown.subdirectories|sort(attribute='logical_bytes', reverse=True) %}
+                    {% if '/' not in subdir.path and subdir.logical_bytes > 0 %}
+                    {% set has_children = namespace(value=false) %}
+                    {% for child in quota.capacity_breakdown.subdirectories %}
+                        {% if child.path.startswith(subdir.path + '/') and child.path.count('/') <= 2 and child.logical_bytes > 0 %}
+                            {% set has_children.value = true %}
+                        {% endif %}
+                    {% endfor %}
+                    <div style="display: flex; align-items: center; padding: 0.25rem 0.25rem; border-bottom: 1px solid #dee2e6; cursor: {% if has_children.value %}pointer{% else %}default{% endif %};"
+                        {% if has_children.value %}onclick="toggleChildren('{{ subdir.path }}')"{% endif %}>
+                        <span style="flex: 1;">
+                            {% if has_children.value %}
+                            <span id="icon-{{ subdir.path }}" style="display: inline-block; width: 15px;">▶</span>
+                            {% else %}
+                            <span style="display: inline-block; width: 15px;"></span>
+                            {% endif %}
+                            <code>{{ subdir.path }}</code>
+                        </span>
+                        <span style="width: 7rem; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0;">{{ "{:,.2f}".format(subdir.logical_bytes / (1000**3)) }}</span>
+                        <span style="width: 5rem; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 1.5rem; padding-left: 1.5rem; border-left: 1px solid #dee2e6;">
+                            {% if quota.hard_limit_bytes %}
+                            {% set pct = subdir.logical_bytes / quota.hard_limit_bytes * 100 %}
+                            {{ "{:.1f}".format(pct) }}%
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {# Child rows (hidden by default) #}
+                    {% for child in quota.capacity_breakdown.subdirectories|sort(attribute='logical_bytes', reverse=True) %}
+                        {% if child.path.startswith(subdir.path + '/') and child.logical_bytes > 0 %}
+                            {% set depth = child.path.count('/') %}
+                            {% if depth <= 2 %}
+                            <div class="child-{{ subdir.path }}" style="display: none; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; align-items: center; padding: 0.25rem 0.25rem;">
+                                <span style="flex: 1;">
+                                    <span style="display: inline-block; width: {{ depth * 20 }}px;"></span>
+                                    <span style="display: inline-block; width: 15px;"></span>
+                                    <code style="font-size: 0.9em;">{{ child.path }}</code>
+                                </span>
+                                <span style="width: 7rem; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0;">{{ "{:,.2f}".format(child.logical_bytes / (1000**3)) }}</span>
+                                <span style="width: 5rem; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 1.5rem; padding-left: 1.5rem; border-left: 1px solid #dee2e6;">
+                                    {% if quota.hard_limit_bytes %}
+                                    {% set child_pct = child.logical_bytes / quota.hard_limit_bytes * 100 %}
+                                    {{ "{:.1f}".format(child_pct) }}%
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    {% endfor %}
                 </div>
                 {% else %}
                 <p class="text-muted"><em>No subdirectories found</em></p>
@@ -349,14 +282,20 @@
 
                     // Save as PDF
                     function printPDF(mode) {
-                        var allChildRows = document.querySelectorAll('tr[class^="child-"]');
+                        var allChildRows = document.querySelectorAll('[class^="child-"]');
                         var previousDisplayStates = [];
+
+                        // Set PDF filename via document title
+                        var originalTitle = document.title;
+                        var quotaPath = '{{ quota.path }}';
+                        var groupName = quotaPath.split('/').filter(Boolean).pop() || '{{ quota.name }}';
+                        document.title = groupName + '-vast-report';
 
                         if (mode === 'expanded') {
                             // Expand all child rows and update icons
                             allChildRows.forEach(function(row) {
                                 previousDisplayStates.push(row.style.display);
-                                row.style.display = 'table-row';
+                                row.style.display = 'flex';
                             });
                             // Set all expand icons to ▼
                             document.querySelectorAll('[id^="icon-"]').forEach(function(icon) {
@@ -384,6 +323,9 @@
                             });
                         }
                         if (wasCollapsed) subdirTable.classList.remove('show');
+
+                        // Restore original title
+                        document.title = originalTitle;
                     }
 
                     // Toggle child directories
@@ -396,7 +338,7 @@
                         const isVisible = children[0] && children[0].style.display !== 'none';
 
                         children.forEach(function(child) {
-                            child.style.display = isVisible ? 'none' : 'table-row';
+                            child.style.display = isVisible ? 'none' : 'flex';
                         });
 
                         if (icon) {
