@@ -16,6 +16,11 @@ host = 0.0.0.0
 # Set debug=false in production (enables Shibboleth authentication, disables user search feature)
 debug = true
 
+[apache]
+# Server hostname for Apache configuration
+# Used by scripts/generate_apache_config.py to generate the Apache config
+server_name = trace-vast-dashboard.cheme.local.cmu.edu
+
 [shibboleth]
 # Shibboleth authentication endpoints (used when debug=false)
 # These are standard paths when using Apache mod_shib
