@@ -162,6 +162,7 @@ def dashboard():
         # Calculations
         'usage_percentage': f"{usage_pct:.1f}",
         'drr': f"{drr:.2f}",
+        'remaining': format_bytes(hard_limit - used_logical) if hard_limit and used_logical else None,
 
         # Grace period
         'grace_period': quota.get('grace_period'),
