@@ -12,7 +12,7 @@ username = trace-gro-svc
 stem = Apps:XRAS:trace_groups
 # Password is read from the GROUPER_PASSWORD environment variable (set in .env)
 # Full colon-delimited Grouper group name that grants access to /scratch
-scratch_access_group = Community:Department:ChemE:admins
+scratch_access_group = Apps:XRAS:trace_groups:cmustaff
 
 [flask]
 # Web server settings
