@@ -105,18 +105,23 @@ def user_in_grouper_group(andrew_id, group_name):
         data = response.json()
         ws_groups = data.get('WsGetGroupsLiteResult', {}).get('wsGroups') or []
 
+        print(f"[grouper] user_in_grouper_group: checking '{andrew_id}' for '{group_name}'")
+        print(f"[grouper] user_in_grouper_group: {len(ws_groups)} groups returned")
         for g in ws_groups:
+            print(f"[grouper]   name={g.get('name')!r}  displayName={g.get('displayName')!r}")
             if g.get('name') == group_name or g.get('displayName') == group_name:
+                print(f"[grouper]   -> MATCH, access granted")
                 return True
 
+        print(f"[grouper] user_in_grouper_group: no match found, access denied")
         return False
 
     except ValueError as e:
-        print(f"Grouper config error checking membership for '{andrew_id}': {e}")
+        print(f"[grouper] config error checking membership for '{andrew_id}': {e}")
         return False
     except requests.HTTPError as e:
-        print(f"Grouper API HTTP error checking membership for '{andrew_id}': {e}")
+        print(f"[grouper] HTTP error checking membership for '{andrew_id}': {e}")
         return False
     except Exception as e:
-        print(f"Error checking Grouper membership for '{andrew_id}' in '{group_name}': {e}")
+        print(f"[grouper] error checking membership for '{andrew_id}' in '{group_name}': {e}")
         return False
