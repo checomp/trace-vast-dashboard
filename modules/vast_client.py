@@ -1,5 +1,6 @@
 """VAST API client wrapper"""
 from modules.grouper_client import get_grouper_group
+from modules.formatting import format_bytes
 import config
 import json
 import os
