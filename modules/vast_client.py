@@ -441,6 +441,73 @@ def get_scratch_quota():
         return None
 
 
+def get_all_quotas():
+    """
+    Return all VAST quotas with basic usage stats for the admin list view.
+
+    Returns:
+        list[dict]: Sorted list of quota summary dicts, or empty list on error
+    """
+    try:
+        client = get_vast_client()
+        quotas = client.quotas.get()
+        results = []
+        for q in quotas:
+            hard_limit = q.get('hard_limit')
+            used_effective = q.get('used_effective_capacity') or q.get('used_effective')
+            api_pct = q.get('percent_capacity')
+            if api_pct is not None:
+                usage_pct = float(api_pct)
+            elif hard_limit and used_effective:
+                usage_pct = used_effective / hard_limit * 100
+            else:
+                usage_pct = 0
+            results.append({
+                'id': q.get('id'),
+                'name': q.get('name'),
+                'path': q.get('path'),
+                'hard_limit': hard_limit,
+                'hard_limit_fmt': format_bytes(hard_limit),
+                'used_effective': used_effective,
+                'used_effective_fmt': format_bytes(used_effective),
+                'usage_pct': round(usage_pct, 1),
+                'state': q.get('state'),
+            })
+        results.sort(key=lambda x: x['path'] or '')
+        return results
+    except Exception as e:
+        print(f"Error fetching all quotas: {e}")
+        return []
+
+
+def get_quota_by_id(quota_id):
+    """
+    Fetch a single VAST quota by numeric ID, including capacity breakdown.
+
+    Args:
+        quota_id: Integer quota ID
+
+    Returns:
+        dict: Full quota object with capacity_breakdown, or None if not found
+    """
+    try:
+        client = get_vast_client()
+        result = client.quotas.get(id=quota_id)
+        if isinstance(result, list):
+            result = result[0] if result else None
+        if not result:
+            return None
+        quota_path = result.get('path')
+        if quota_path:
+            breakdown = get_capacity_breakdown(quota_path)
+            if breakdown:
+                result['capacity_breakdown'] = breakdown
+        return result
+    except Exception as e:
+        print(f"Error fetching quota id={quota_id}: {e}")
+        return None
+
+
 def get_quota_for_user(andrew_id):
     """
     Get quota information for a specific user by:

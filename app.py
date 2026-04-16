@@ -5,7 +5,7 @@ sys.path.insert(0, '/opt/vast-quota-web')
 from flask import Flask, render_template, request, redirect, url_for, abort
 from modules.auth import get_current_user, login_required
 from modules.grouper_client import user_in_grouper_group
-from modules.vast_client import get_quota_for_user, get_scratch_quota
+from modules.vast_client import get_quota_for_user, get_scratch_quota, get_all_quotas, get_quota_by_id
 from modules.formatting import format_bytes, calculate_percentage
 import config
 import logging
@@ -41,11 +41,11 @@ logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
 logger = logging.getLogger(__name__)
 
 
-def _check_scratch_access(user):
+def _check_admin_access(user):
     """Return True if user is in the configured scratch access Grouper group."""
     if not user:
         return False
-    group = config.get('grouper', 'scratch_access_group', '')
+    group = config.get('grouper', 'admin_group', '')
     if not group:
         return False
     return user_in_grouper_group(user, group)
@@ -140,9 +140,9 @@ def dashboard():
     if not fetch_quota and not search_user:
         if app.debug and not current_user:
             return render_template('search_prompt.html')
-        has_scratch_access = _check_scratch_access(current_user)
+        has_admin_access = _check_admin_access(current_user)
         return render_template('welcome.html', current_user=current_user,
-                               has_scratch_access=has_scratch_access)
+                               has_admin_access=has_admin_access)
 
     # Determine which user's quota to fetch
     if search_user:
@@ -188,7 +188,7 @@ def scratch():
 
     # In production, enforce Grouper group membership
     if not app.debug:
-        if not _check_scratch_access(current_user):
+        if not _check_admin_access(current_user):
             logger.warning(f"User '{current_user}' attempted to access /scratch without group membership")
             abort(403, "You do not have permission to view the scratch quota.")
 
@@ -212,6 +212,52 @@ def scratch():
                            is_search=False,
                            debug_mode=app.debug,
                            quota=quota_display)
+
+
+@app.route('/admin/quotas')
+def admin_quotas():
+    """Admin quota list — all VAST quotas, restricted to admin_group members."""
+    current_user = get_current_user()
+
+    if not app.debug and not current_user:
+        abort(403, "Authentication failed - REMOTE_USER not set")
+
+    if not app.debug and not _check_admin_access(current_user):
+        logger.warning(f"User '{current_user}' attempted to access /admin/quotas without permission")
+        abort(403, "You do not have permission to view this page.")
+
+    quotas = get_all_quotas()
+    return render_template('admin_quotas.html', current_user=current_user,
+                           debug_mode=app.debug, quotas=quotas)
+
+
+@app.route('/admin/quota/<int:quota_id>')
+def admin_quota_detail(quota_id):
+    """Admin quota detail — full dashboard for any quota by ID."""
+    current_user = get_current_user()
+
+    if not app.debug and not current_user:
+        abort(403, "Authentication failed - REMOTE_USER not set")
+
+    if not app.debug and not _check_admin_access(current_user):
+        logger.warning(f"User '{current_user}' attempted to access /admin/quota/{quota_id} without permission")
+        abort(403, "You do not have permission to view this page.")
+
+    quota = get_quota_by_id(quota_id)
+
+    if not quota:
+        return render_template('error.html',
+                               error_message=f"No quota found with ID {quota_id}.",
+                               show_back_button=True)
+
+    quota_display = _format_quota_for_display(quota)
+    return render_template('dashboard.html',
+                           current_user=current_user,
+                           displayed_user=None,
+                           is_search=False,
+                           debug_mode=app.debug,
+                           quota=quota_display,
+                           back_url='/admin/quotas')
 
 
 @app.route('/health')

@@ -47,7 +47,7 @@
         {% if is_search %}
         <p class="lead">Quota information for: <strong>{{ displayed_user }}</strong> <a href="/dashboard" class="btn btn-sm btn-secondary ml-2">← Back to Dashboard</a></p>
         {% else %}
-        <p class="lead">Your current storage quota usage <a href="/dashboard" class="btn btn-sm btn-secondary ml-2">← Back to Dashboard</a></p>
+        <p class="lead">{{ quota.name }} <a href="{{ back_url | default('/dashboard') }}" class="btn btn-sm btn-secondary ml-2">← Back</a></p>
         {% endif %}
 
         <div id="pdfToolbar" class="mb-3">

@@ -19,10 +19,15 @@
                 <a href="/dashboard?fetch=true" class="btn btn-primary btn-lg px-5">
                     View My Group's Quota
                 </a>
-                {% if has_scratch_access %}
+                {% if has_admin_access %}
                 <div class="mt-3">
                     <a href="/scratch" class="btn btn-outline-secondary btn-lg px-5">
                         View Scratch Quota
+                    </a>
+                </div>
+                <div class="mt-3">
+                    <a href="/admin/quotas" class="btn btn-outline-secondary btn-lg px-5">
+                        Browse All Quotas
                     </a>
                 </div>
                 {% endif %}
