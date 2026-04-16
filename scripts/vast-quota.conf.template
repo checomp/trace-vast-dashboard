@@ -58,6 +58,12 @@ Listen 443 https
         ShibRequestSetting requireSession 1
         Require valid-user
     </Location>
+
+    <Location /scratch>
+        AuthType shibboleth
+        ShibRequestSetting requireSession 1
+        Require valid-user
+    </Location>
     
     # Security headers
     Header always set X-Frame-Options "DENY"
