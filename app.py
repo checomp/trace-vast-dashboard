@@ -141,9 +141,8 @@ def dashboard():
         if app.debug and not current_user:
             return render_template('search_prompt.html')
         has_admin_access = _check_admin_access(current_user)
-        quotas = get_all_quotas() if has_admin_access else []
         return render_template('welcome.html', current_user=current_user,
-                               has_admin_access=has_admin_access, quotas=quotas)
+                               has_admin_access=has_admin_access)
 
     # Determine which user's quota to fetch
     if search_user:

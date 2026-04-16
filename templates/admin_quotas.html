@@ -1,98 +1,54 @@
 {% extends "base.html" %}
 
-{% block title %}All Quotas{% endblock %}
-
-{% block head %}
-<style>
-    #quotaTable tbody tr { cursor: pointer; }
-    #quotaTable tbody tr:hover { background-color: #f5f5f5; }
-    .usage-bar {
-        height: 8px;
-        border-radius: 4px;
-        background-color: #e9ecef;
-        min-width: 80px;
-    }
-    .usage-bar-fill {
-        height: 100%;
-        border-radius: 4px;
-    }
-</style>
-{% endblock %}
+{% block title %}Browse Quotas{% endblock %}
 
 {% block content %}
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h1>All Quotas</h1>
-        <p class="lead text-muted">{{ quotas|length }} quota{{ 's' if quotas|length != 1 }} on the VAST system</p>
-    </div>
-</div>
-
-<div class="row mb-3">
-    <div class="col-md-4">
-        <input type="text" id="searchInput" class="form-control" placeholder="Filter by name or path…" oninput="filterTable()">
-    </div>
-    <div class="col-md-8 text-end">
-        <a href="/dashboard" class="btn btn-outline-secondary">← Back to Dashboard</a>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
         <div class="card shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0" id="quotaTable">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Name</th>
-                            <th>Path</th>
-                            <th style="width:7rem;">Used</th>
-                            <th style="width:7rem;">Limit</th>
-                            <th style="width:10rem;">Usage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <div class="card-body p-5">
+                <h3 class="mb-4">Browse All Quotas</h3>
+                <p class="text-muted mb-4">Select a quota to view its full dashboard.</p>
+
+                {% if quotas %}
+                <div class="mb-3">
+                    <select id="quotaSelect" class="form-select form-select-lg">
+                        <option value="" disabled selected>— Select a quota —</option>
                         {% for q in quotas %}
-                        <tr onclick="window.location='/admin/quota/{{ q.id }}'">
-                            <td>{{ q.name or '—' }}</td>
-                            <td><code>{{ q.path or '—' }}</code></td>
-                            <td>{{ q.used_effective_fmt }}</td>
-                            <td>{{ q.hard_limit_fmt }}</td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="usage-bar flex-grow-1">
-                                        <div class="usage-bar-fill
-                                            {% if q.usage_pct < 75 %}bg-success
-                                            {% elif q.usage_pct < 90 %}bg-warning
-                                            {% else %}bg-danger{% endif %}"
-                                            style="width: {{ [q.usage_pct, 100]|min }}%">
-                                        </div>
-                                    </div>
-                                    <span class="text-nowrap
-                                        {% if q.usage_pct < 75 %}text-success
-                                        {% elif q.usage_pct < 90 %}text-warning
-                                        {% else %}text-danger{% endif %}"
-                                        style="width:3.5rem; text-align:right; font-variant-numeric: tabular-nums;">
-                                        {{ q.usage_pct }}%
-                                    </span>
-                                </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5" class="text-center text-muted py-4">No quotas found.</td></tr>
+                        <option value="/admin/quota/{{ q.id }}">
+                            {{ q.name }} ({{ q.path }}) — {{ q.usage_pct }}%
+                        </option>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </select>
+                </div>
+                <div class="d-grid">
+                    <button id="viewBtn" class="btn btn-primary btn-lg" disabled onclick="goToQuota()">
+                        View Dashboard
+                    </button>
+                </div>
+                {% else %}
+                <p class="text-muted">No quotas found.</p>
+                {% endif %}
+
+                <div class="mt-4">
+                    <a href="/dashboard" class="btn btn-outline-secondary">← Back to Dashboard</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    function filterTable() {
-        const q = document.getElementById('searchInput').value.toLowerCase();
-        document.querySelectorAll('#quotaTable tbody tr').forEach(function(row) {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
+    const select = document.getElementById('quotaSelect');
+    const btn = document.getElementById('viewBtn');
+
+    select.addEventListener('change', function () {
+        btn.disabled = !this.value;
+    });
+
+    function goToQuota() {
+        const val = document.getElementById('quotaSelect').value;
+        if (val) window.location = val;
     }
 </script>
 {% endblock %}
