@@ -17,8 +17,15 @@
                     Click below to view your current storage quota and usage information on the VAST system.
                 </p>
                 <a href="/dashboard?fetch=true" class="btn btn-primary btn-lg px-5">
-                    View My Quota
+                    View My Group's Quota
                 </a>
+                {% if has_scratch_access %}
+                <div class="mt-3">
+                    <a href="/scratch" class="btn btn-outline-secondary btn-lg px-5">
+                        View Scratch Quota
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

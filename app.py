@@ -4,7 +4,8 @@ sys.path.insert(0, '/opt/vast-quota-web')
 
 from flask import Flask, render_template, request, redirect, url_for, abort
 from modules.auth import get_current_user, login_required
-from modules.vast_client import get_quota_for_user
+from modules.grouper_client import user_in_grouper_group
+from modules.vast_client import get_quota_for_user, get_scratch_quota
 from modules.formatting import format_bytes, calculate_percentage
 import config
 import logging
@@ -39,6 +40,77 @@ if _debug:
 logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
 logger = logging.getLogger(__name__)
 
+
+def _check_scratch_access(user):
+    """Return True if user is in the configured scratch access Grouper group."""
+    if not user:
+        return False
+    group = config.get('grouper', 'scratch_access_group', '')
+    if not group:
+        return False
+    return user_in_grouper_group(user, group)
+
+
+def _format_quota_for_display(quota):
+    """Format a raw VAST quota dict into the shape expected by dashboard.html."""
+    from modules.formatting import calculate_drr
+
+    hard_limit = quota.get('hard_limit')
+    soft_limit = quota.get('soft_limit')
+    used_effective = quota.get('used_effective_capacity') or quota.get('used_effective')
+
+    capacity_breakdown = quota.get('capacity_breakdown')
+    used_logical = None
+    if capacity_breakdown and capacity_breakdown.get('root'):
+        used_logical = capacity_breakdown['root'].get('logical_bytes')
+
+    used_inodes = quota.get('used_inodes')
+    soft_limit_inodes = quota.get('soft_limit_inodes')
+    hard_limit_inodes = quota.get('hard_limit_inodes')
+
+    api_pct = quota.get('percent_capacity')
+    if api_pct is not None:
+        usage_pct = api_pct
+    elif hard_limit and used_effective:
+        usage_pct = calculate_percentage(used_effective, hard_limit)
+    else:
+        usage_pct = 0
+
+    inode_usage_pct = 0
+    if hard_limit_inodes and used_inodes:
+        inode_usage_pct = calculate_percentage(used_inodes, hard_limit_inodes)
+    elif soft_limit_inodes and used_inodes:
+        inode_usage_pct = calculate_percentage(used_inodes, soft_limit_inodes)
+
+    drr = calculate_drr(used_logical, used_effective) if used_logical and used_effective else 0
+
+    return {
+        'name': quota.get('name'),
+        'path': quota.get('path'),
+        'guid': quota.get('guid'),
+        'state': quota.get('state'),
+        'cluster': quota.get('cluster'),
+        'tenant_name': quota.get('tenant_name'),
+        'hard_limit': format_bytes(hard_limit),
+        'soft_limit': format_bytes(soft_limit),
+        'used_effective': format_bytes(used_effective),
+        'used_logical': format_bytes(used_logical) if used_logical else 'N/A',
+        'hard_limit_bytes': hard_limit,
+        'soft_limit_bytes': soft_limit,
+        'used_effective_bytes': used_effective,
+        'used_logical_bytes': used_logical,
+        'used_inodes': f"{used_inodes:,}" if used_inodes else 'N/A',
+        'soft_limit_inodes': f"{soft_limit_inodes:,}" if soft_limit_inodes else 'No limit',
+        'hard_limit_inodes': f"{hard_limit_inodes:,}" if hard_limit_inodes else 'No limit',
+        'inode_usage_percentage': f"{inode_usage_pct:.1f}" if inode_usage_pct > 0 else None,
+        'usage_percentage': f"{usage_pct:.1f}",
+        'drr': f"{drr:.2f}",
+        'remaining': format_bytes(hard_limit - used_logical) if hard_limit and used_logical else None,
+        'grace_period': quota.get('grace_period'),
+        'capacity_breakdown': capacity_breakdown,
+    }
+
+
 @app.route('/')
 def landing():
     """Public landing page - no authentication required."""
@@ -68,7 +140,9 @@ def dashboard():
     if not fetch_quota and not search_user:
         if app.debug and not current_user:
             return render_template('search_prompt.html')
-        return render_template('welcome.html', current_user=current_user)
+        has_scratch_access = _check_scratch_access(current_user)
+        return render_template('welcome.html', current_user=current_user,
+                               has_scratch_access=has_scratch_access)
 
     # Determine which user's quota to fetch
     if search_user:
@@ -94,82 +168,7 @@ def dashboard():
                              error_message=error_msg,
                              show_back_button=bool(search_user))
     
-    # Extract raw values (handle different API field name variants)
-    hard_limit = quota.get('hard_limit')
-    soft_limit = quota.get('soft_limit')
-    used_effective = quota.get('used_effective_capacity') or quota.get('used_effective')
-
-    # Get logical capacity from capacity breakdown root if available
-    capacity_breakdown = quota.get('capacity_breakdown')
-    used_logical = None
-    if capacity_breakdown and capacity_breakdown.get('root'):
-        used_logical = capacity_breakdown['root'].get('logical_bytes')
-
-    # Inode information
-    used_inodes = quota.get('used_inodes')
-    soft_limit_inodes = quota.get('soft_limit_inodes')
-    hard_limit_inodes = quota.get('hard_limit_inodes')
-
-    # Calculate usage percentage.
-    # Use VAST's own percent_capacity first — it's what VAST enforces.
-    # Fall back to used_effective_capacity / hard_limit if not provided.
-    api_pct = quota.get('percent_capacity')
-    if api_pct is not None:
-        usage_pct = api_pct
-    elif hard_limit and used_effective:
-        usage_pct = calculate_percentage(used_effective, hard_limit)
-    else:
-        usage_pct = 0
-
-    # Calculate inode usage percentage
-    inode_usage_pct = 0
-    if hard_limit_inodes and used_inodes:
-        inode_usage_pct = calculate_percentage(used_inodes, hard_limit_inodes)
-    elif soft_limit_inodes and used_inodes:
-        inode_usage_pct = calculate_percentage(used_inodes, soft_limit_inodes)
-
-    # Calculate DRR
-    from modules.formatting import calculate_drr
-    drr = calculate_drr(used_logical, used_effective) if used_logical and used_effective else 0
-
-    # Format data for display
-    quota_display = {
-        'name': quota.get('name'),
-        'path': quota.get('path'),
-        'guid': quota.get('guid'),
-        'state': quota.get('state'),
-        'cluster': quota.get('cluster'),
-        'tenant_name': quota.get('tenant_name'),
-
-        # Formatted capacity values
-        'hard_limit': format_bytes(hard_limit),
-        'soft_limit': format_bytes(soft_limit),
-        'used_effective': format_bytes(used_effective),
-        'used_logical': format_bytes(used_logical) if used_logical else 'N/A',
-
-        # Raw byte values
-        'hard_limit_bytes': hard_limit,
-        'soft_limit_bytes': soft_limit,
-        'used_effective_bytes': used_effective,
-        'used_logical_bytes': used_logical,
-
-        # Inode information
-        'used_inodes': f"{used_inodes:,}" if used_inodes else 'N/A',
-        'soft_limit_inodes': f"{soft_limit_inodes:,}" if soft_limit_inodes else 'No limit',
-        'hard_limit_inodes': f"{hard_limit_inodes:,}" if hard_limit_inodes else 'No limit',
-        'inode_usage_percentage': f"{inode_usage_pct:.1f}" if inode_usage_pct > 0 else None,
-
-        # Calculations
-        'usage_percentage': f"{usage_pct:.1f}",
-        'drr': f"{drr:.2f}",
-        'remaining': format_bytes(hard_limit - used_logical) if hard_limit and used_logical else None,
-
-        # Grace period
-        'grace_period': quota.get('grace_period'),
-
-        # Capacity breakdown
-        'capacity_breakdown': capacity_breakdown
-    }
+    quota_display = _format_quota_for_display(quota)
 
     return render_template('dashboard.html',
                          current_user=current_user,
@@ -177,6 +176,43 @@ def dashboard():
                          is_search=(search_user != ''),
                          debug_mode=app.debug,
                          quota=quota_display)
+
+@app.route('/scratch')
+def scratch():
+    """Scratch quota page — restricted to members of the configured Grouper group."""
+    current_user = get_current_user()
+
+    if not app.debug and not current_user:
+        logger.error("No REMOTE_USER set after Shibboleth authentication")
+        abort(403, "Authentication failed - REMOTE_USER not set")
+
+    # In production, enforce Grouper group membership
+    if not app.debug:
+        if not _check_scratch_access(current_user):
+            logger.warning(f"User '{current_user}' attempted to access /scratch without group membership")
+            abort(403, "You do not have permission to view the scratch quota.")
+
+    quota = get_scratch_quota()
+
+    if not quota:
+        scratch_path = config.get('vast', 'scratch_path', '/trace/scratch')
+        return render_template('error.html',
+                               error_message=f"No quota found for scratch path '{scratch_path}'.",
+                               show_back_button=True)
+
+    if app.debug and quota:
+        import json
+        logger.debug(f"Raw VAST scratch quota response:\n{json.dumps(quota, indent=2, default=str)}")
+
+    quota_display = _format_quota_for_display(quota)
+
+    return render_template('dashboard.html',
+                           current_user=current_user,
+                           displayed_user=None,
+                           is_search=False,
+                           debug_mode=app.debug,
+                           quota=quota_display)
+
 
 @app.route('/health')
 def health_check():

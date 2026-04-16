@@ -72,3 +72,51 @@ def get_grouper_group(andrew_id):
     except Exception as e:
         print(f"Error fetching Grouper groups for '{andrew_id}': {e}")
         return []
+
+
+def user_in_grouper_group(andrew_id, group_name):
+    """
+    Check if a user is a member of a specific Grouper group.
+
+    Args:
+        andrew_id: Andrew ID to check (e.g. 'rwalsh')
+        group_name: Full colon-delimited Grouper group name
+                    (e.g. 'Community:Department:ChemE:admins')
+
+    Returns:
+        bool: True if the user is a member, False otherwise
+    """
+    try:
+        base_url = config.get(
+            'grouper', 'base_url',
+            'https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600'
+        )
+        auth = _get_auth()
+
+        url = f"{base_url}/subjects/{andrew_id}/groups"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        }
+
+        response = requests.get(url, auth=auth, headers=headers, timeout=15)
+        response.raise_for_status()
+
+        data = response.json()
+        ws_groups = data.get('WsGetGroupsLiteResult', {}).get('wsGroups') or []
+
+        for g in ws_groups:
+            if g.get('name') == group_name or g.get('displayName') == group_name:
+                return True
+
+        return False
+
+    except ValueError as e:
+        print(f"Grouper config error checking membership for '{andrew_id}': {e}")
+        return False
+    except requests.HTTPError as e:
+        print(f"Grouper API HTTP error checking membership for '{andrew_id}': {e}")
+        return False
+    except Exception as e:
+        print(f"Error checking Grouper membership for '{andrew_id}' in '{group_name}': {e}")
+        return False

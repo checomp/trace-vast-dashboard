@@ -391,6 +391,56 @@ def get_capacity_breakdown(quota_path):
         traceback.print_exc()
         return None
 
+def get_quota_by_path(path):
+    """
+    Find a VAST quota by its exact filesystem path.
+
+    Args:
+        path: The quota path to match (e.g. '/trace/scratch')
+
+    Returns:
+        dict: Quota object, or None if not found
+    """
+    try:
+        client = get_vast_client()
+        quotas = client.quotas.get()
+        for quota in quotas:
+            if quota.get('path') == path:
+                return quota
+        print(f"No quota found at path '{path}'")
+        return None
+    except Exception as e:
+        print(f"Error fetching quota at path '{path}': {e}")
+        raise
+
+
+def get_scratch_quota():
+    """
+    Get the quota and capacity breakdown for the configured scratch path.
+
+    Returns:
+        dict: Complete quota information including capacity breakdown, or None
+    """
+    try:
+        scratch_path = config.get('vast', 'scratch_path', '/trace/scratch')
+        quota = get_quota_by_path(scratch_path)
+        if not quota:
+            return None
+
+        quota_path = quota.get('path')
+        if quota_path:
+            capacity_breakdown = get_capacity_breakdown(quota_path)
+            if capacity_breakdown:
+                quota['capacity_breakdown'] = capacity_breakdown
+
+        return quota
+    except Exception as e:
+        print(f"Error fetching scratch quota: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def get_quota_for_user(andrew_id):
     """
     Get quota information for a specific user by:
