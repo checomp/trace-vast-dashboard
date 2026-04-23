@@ -512,6 +512,7 @@ def get_quota_by_id(quota_id):
 def get_old_scratch_files(days=29):
     """
     Return files in the scratch path whose creation time is older than `days` days.
+    Scans the NFS-mounted filesystem directly — no VAST API involved.
 
     Args:
         days: minimum age in days
@@ -520,68 +521,37 @@ def get_old_scratch_files(days=29):
         list[dict]: sorted by owner ASC then size DESC, each dict has:
             owner, path, size_bytes, size_human, ctime, age_days
     """
+    import os as _os
+    import pwd as _pwd
     from datetime import datetime, timezone, timedelta
 
     scratch_path = config.get('vast', 'scratch_path', '/trace/scratch')
-    address      = config.get('vast', 'address', '10.143.11.203')
-    cutoff_ts    = int((datetime.now(tz=timezone.utc) - timedelta(days=days)).timestamp())
+    cutoff_ts    = (datetime.now(tz=timezone.utc) - timedelta(days=days)).timestamp()
+    now          = datetime.now(tz=timezone.utc)
 
-    import os as _os
-    password = _os.environ.get('TRACE_API_PASSWORD')
-    if not password:
-        raise RuntimeError("TRACE_API_PASSWORD env var not set")
-    user = config.get('vast', 'username', 'admin')
-    headers = urllib3.make_headers(basic_auth=f"{user}:{password}")
-    headers['Accept'] = 'application/json'
-
-    pm = urllib3.ProxyManager(proxy_url, cert_reqs='CERT_NONE')
-
-    results = []
-    url    = f"https://{address}/api/files/"
-    fields = [('path', scratch_path), ('ctime_lte', cutoff_ts), ('page_size', 1000)]
-
-    while url:
-        r = pm.request('GET', url, headers=headers, fields=fields)
-        if r.status not in (200, 201):
-            raise Exception(f"VAST files API {r.status}: {r.data[:300]}")
-        body = json.loads(r.data.decode('utf-8'))
-        if isinstance(body, list):
-            results.extend(body)
-            break
-        elif isinstance(body, dict):
-            results.extend(body.get('results') or body.get('data') or [])
-            url    = body.get('next')
-            fields = None
-        else:
-            break
-
-    now  = datetime.now(tz=timezone.utc)
     rows = []
-    for f in results:
-        ftype = (f.get('type') or f.get('file_type') or '').lower()
-        if ftype in ('dir', 'directory', 'd'):
-            continue
-        ctime_raw = f.get('ctime') or f.get('creation_time') or f.get('created_time')
-        if ctime_raw is None:
-            continue
-        if isinstance(ctime_raw, (int, float)):
-            ctime_dt = datetime.fromtimestamp(ctime_raw, tz=timezone.utc)
-        else:
+    for dirpath, dirnames, filenames in _os.walk(scratch_path):
+        for fname in filenames:
+            fpath = _os.path.join(dirpath, fname)
             try:
-                ctime_dt = datetime.fromisoformat(str(ctime_raw).replace('Z', '+00:00'))
-            except ValueError:
+                st = _os.stat(fpath)
+            except OSError:
                 continue
-        size  = int(f.get('size') or f.get('used_capacity') or f.get('logical_size') or 0)
-        owner = (f.get('owner') or f.get('username') or f.get('uid_name')
-                 or str(f.get('uid', 'unknown')))
-        rows.append({
-            'owner':      owner,
-            'path':       f.get('path') or f.get('name') or '',
-            'size_bytes': size,
-            'size_human': format_bytes(size),
-            'ctime':      ctime_dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
-            'age_days':   (now - ctime_dt).days,
-        })
+            if st.st_ctime > cutoff_ts:
+                continue
+            try:
+                owner = _pwd.getpwuid(st.st_uid).pw_name
+            except KeyError:
+                owner = str(st.st_uid)
+            ctime_dt = datetime.fromtimestamp(st.st_ctime, tz=timezone.utc)
+            rows.append({
+                'owner':      owner,
+                'path':       fpath,
+                'size_bytes': st.st_size,
+                'size_human': format_bytes(st.st_size),
+                'ctime':      ctime_dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'age_days':   (now - ctime_dt).days,
+            })
 
     rows.sort(key=lambda r: (r['owner'].lower(), -r['size_bytes']))
     return rows

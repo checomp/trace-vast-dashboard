@@ -5,6 +5,8 @@ address = 172.19.16.30
 timeout = 30
 # Filesystem path of the scratch quota shown on /scratch
 scratch_path = /trace/scratch
+# VAST API endpoint for file listing (varies by firmware version: try viewfiles, files, folders)
+files_endpoint = viewfiles
 
 [grouper]
 base_url = https://grouper.andrew.cmu.edu/grouper-ws/servicesRest/v2_5_600
