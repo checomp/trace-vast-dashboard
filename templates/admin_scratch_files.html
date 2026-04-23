@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Scratch File Age Report{% endblock %}
+
+{% block head %}
+<style>
+    #fileTable tbody tr:hover { background-color: #f5f5f5; }
+    .owner-header td {
+        background-color: #e9ecef;
+        font-weight: 600;
+        border-top: 2px solid #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h1>Scratch File Age Report</h1>
+        <p class="lead text-muted">Find files in <code>/trace/scratch</code> created more than N days ago.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <form method="get" action="/admin/scratch-files" class="d-flex align-items-center gap-2">
+            <label for="daysInput" class="form-label mb-0 text-nowrap fw-semibold">Files older than</label>
+            <input type="number" id="daysInput" name="days" class="form-control"
+                   style="width:6rem;" min="1" max="365"
+                   value="{{ days if days else 29 }}" required>
+            <span class="text-nowrap">days</span>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        {% if error %}
+        <div class="alert alert-danger mt-2 mb-0 py-2">{{ error }}</div>
+        {% endif %}
+    </div>
+    <div class="col-md-6 text-end d-flex align-items-start justify-content-end gap-2">
+        {% if files is not none %}
+        <a href="/admin/scratch-files?days={{ days }}&export=csv" class="btn btn-outline-success">
+            Export CSV
+        </a>
+        {% endif %}
+        <a href="/admin/quotas" class="btn btn-outline-secondary">← Back to Quotas</a>
+    </div>
+</div>
+
+{% if files is not none %}
+<div class="row mb-2">
+    <div class="col">
+        {% if files %}
+        <p class="text-muted mb-2">
+            <strong>{{ files|length }}</strong> file{{ 's' if files|length != 1 }}
+            across <strong>{{ files|map(attribute='owner')|unique|list|length }}</strong> user{{ 's' if files|map(attribute='owner')|unique|list|length != 1 }}
+            — created more than <strong>{{ days }}</strong> days ago.
+            <small class="text-warning">Note: large result sets may take a moment to load.</small>
+        </p>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" id="fileTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Owner</th>
+                            <th>Path</th>
+                            <th style="width:8rem;">Size</th>
+                            <th style="width:13rem;">Created</th>
+                            <th style="width:5rem;">Age</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set ns = namespace(last_owner=None) %}
+                        {% for f in files %}
+                            {% if f.owner != ns.last_owner %}
+                            <tr class="owner-header">
+                                <td colspan="5">{{ f.owner }}</td>
+                            </tr>
+                            {% set ns.last_owner = f.owner %}
+                            {% endif %}
+                            <tr>
+                                <td class="text-muted small">{{ f.owner }}</td>
+                                <td><code class="small">{{ f.path }}</code></td>
+                                <td class="text-end">{{ f.size_human }}</td>
+                                <td class="small text-muted">{{ f.ctime }}</td>
+                                <td class="text-end">{{ f.age_days }}d</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            No files found in <code>/trace/scratch</code> older than <strong>{{ days }}</strong> days.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

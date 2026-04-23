@@ -36,6 +36,17 @@ logout_url = /Shibboleth.sso/Logout
 [cache]
 ttl = 600
 
+[email]
+# SMTP settings used by scripts/scratch_old_files.py --notify
+smtp_host = smtp.andrew.cmu.edu
+smtp_port = 587
+# Leave smtp_user / smtp_password blank if the server accepts unauthenticated relay
+smtp_user =
+smtp_password =
+from_address = trace-support@andrew.cmu.edu
+# Email domain appended to VAST owner names: <owner>@<user_domain>
+user_domain = andrew.cmu.edu
+
 [logging]
 # Production (debug=false): logs go to stderr → journalctl automatically (no file needed)
 #   View with: journalctl -u apache2 -f   (or your httpd service name)

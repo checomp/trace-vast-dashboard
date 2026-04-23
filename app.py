@@ -5,7 +5,7 @@ sys.path.insert(0, '/opt/vast-quota-web')
 from flask import Flask, render_template, request, redirect, url_for, abort
 from modules.auth import get_current_user, login_required
 from modules.grouper_client import user_in_grouper_group
-from modules.vast_client import get_quota_for_user, get_scratch_quota, get_all_quotas, get_quota_by_id
+from modules.vast_client import get_quota_for_user, get_scratch_quota, get_all_quotas, get_quota_by_id, get_old_scratch_files
 from modules.formatting import format_bytes, calculate_percentage
 import config
 import logging
@@ -258,6 +258,64 @@ def admin_quota_detail(quota_id):
                            debug_mode=app.debug,
                            quota=quota_display,
                            back_url='/admin/quotas')
+
+
+@app.route('/admin/scratch-files')
+def admin_scratch_files():
+    """Admin view of old scratch files — restricted to admin_group members."""
+    current_user = get_current_user()
+
+    if not app.debug and not current_user:
+        abort(403, "Authentication failed - REMOTE_USER not set")
+
+    if not app.debug and not _check_admin_access(current_user):
+        logger.warning(f"User '{current_user}' attempted to access /admin/scratch-files without permission")
+        abort(403, "You do not have permission to view this page.")
+
+    # Only query when days param is present; otherwise just show the form.
+    days_param = request.args.get('days', '').strip()
+    files = None
+    days  = None
+    error = None
+
+    if days_param:
+        try:
+            days = int(days_param)
+            if not (1 <= days <= 365):
+                raise ValueError
+        except ValueError:
+            error = "Please enter a number of days between 1 and 365."
+            days = None
+
+        if days is not None:
+            try:
+                files = get_old_scratch_files(days)
+                logger.info(f"Admin '{current_user}' queried scratch files older than {days} days — {len(files)} results")
+            except Exception as e:
+                logger.error(f"Error fetching old scratch files: {e}", exc_info=True)
+                error = f"Error fetching files from VAST: {e}"
+                files = []
+
+    # CSV export
+    if request.args.get('export') == 'csv' and files is not None:
+        import csv, io
+        from flask import Response
+        out = io.StringIO()
+        writer = csv.DictWriter(out, fieldnames=['owner', 'path', 'size_bytes', 'size_human', 'ctime', 'age_days'])
+        writer.writeheader()
+        writer.writerows(files)
+        return Response(
+            out.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=scratch_old_files_{days}d.csv'}
+        )
+
+    return render_template('admin_scratch_files.html',
+                           current_user=current_user,
+                           debug_mode=app.debug,
+                           days=days,
+                           files=files,
+                           error=error)
 
 
 @app.route('/health')
